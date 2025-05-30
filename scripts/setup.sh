@@ -61,6 +61,10 @@ node src/mcp_server.js &
 MCP_PID=$!
 echo "✅ DBot ready (PID: $MCP_PID)"
 
+# Auto-install to MCP apps
+echo "🔗 Installing to MCP applications..."
+node scripts/auto_install_mcp.cjs
+
 # Download models in background
 echo "📥 Downloading models in background..."
 {
