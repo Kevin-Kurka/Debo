@@ -16,7 +16,6 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "redis": "^4.6.0",
-    "langchain": "^0.2.0",
     "commander": "^11.0.0",
     "dotenv": "^16.0.0"
   },

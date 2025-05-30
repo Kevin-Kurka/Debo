@@ -1,46 +1,82 @@
-const { MCPServer } = require('@modelcontextprotocol/sdk');
+const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
+const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
 const redis = require('redis');
 const { spawn } = require('child_process');
 const path = require('path');
 
 class DBotMCPServer {
     constructor() {
-        this.redis = redis.createClient({ url: process.env.REDIS_URL || 'redis://localhost:6379' });
-        this.server = new MCPServer({ name: 'dbot', version: '1.0.0' });
-        this.orchestratorProcess = null;
+        this.server = new Server({
+            name: 'dbot',
+            version: '1.0.0'
+        }, {
+            capabilities: {
+                tools: {}
+            }
+        });
+        
+        this.setupRedis();
         this.setupTools();
     }
 
+    async setupRedis() {
+        try {
+            this.redis = redis.createClient({ url: process.env.REDIS_URL || 'redis://localhost:6379' });
+            await this.redis.connect();
+        } catch (error) {
+            console.error('Redis connection failed:', error.message);
+        }
+    }
+
     setupTools() {
-        // Main DBot tool for any MCP-capable application
-        this.server.tool('dbot', 'Development Bot - AI-powered development assistant', {
-            type: 'object',
-            properties: {
-                request: { type: 'string', description: 'Development request or feature' },
-                project_path: { type: 'string', description: 'Project directory path' },
-                context: { type: 'string', description: 'Additional context' }
-            },
-            required: ['request']
-        }, this.dbot.bind(this));
+        this.server.setRequestHandler('tools/list', async () => ({
+            tools: [
+                {
+                    name: 'dbot',
+                    description: 'Development Bot - AI-powered development assistant',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            request: { type: 'string', description: 'Development request or feature' },
+                            project_path: { type: 'string', description: 'Project directory path' },
+                            context: { type: 'string', description: 'Additional context' }
+                        },
+                        required: ['request']
+                    }
+                },
+                {
+                    name: 'create_project',
+                    description: 'Create new project',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            name: { type: 'string', description: 'Project name' },
+                            template: { type: 'string', description: 'Project template' }
+                        },
+                        required: ['name']
+                    }
+                }
+            ]
+        }));
 
-        // Project management tools
-        this.server.tool('create_project', 'Create new project', {
-            type: 'object',
-            properties: {
-                name: { type: 'string', description: 'Project name' },
-                template: { type: 'string', description: 'Project template' }
-            },
-            required: ['name']
-        }, this.createProject.bind(this));
-
-        this.server.tool('list_projects', 'List all projects', {}, this.listProjects.bind(this));
+        this.server.setRequestHandler('tools/call', async (request) => {
+            if (request.params.name === 'dbot') {
+                return await this.dbot(request.params.arguments);
+            } else if (request.params.name === 'create_project') {
+                return await this.createProject(request.params.arguments);
+            }
+            throw new Error(`Unknown tool: ${request.params.name}`);
+        });
     }
 
     async dbot({ request, project_path = '', context = '' }) {
         try {
-            // Store request in Redis for orchestrator
+            if (!this.redis) {
+                return { content: [{ type: 'text', text: 'Redis not connected. Run setup first.' }] };
+            }
+
             const requestId = Date.now().toString();
-            await this.redis.hset(`request:${requestId}`, {
+            await this.redis.hSet(`request:${requestId}`, {
                 request,
                 project_path,
                 context,
@@ -48,86 +84,76 @@ class DBotMCPServer {
                 timestamp: new Date().toISOString()
             });
 
-            // Trigger orchestrator processing
             const result = await this.triggerOrchestrator(requestId);
             
             return {
-                success: true,
-                request_id: requestId,
-                response: result
+                content: [{
+                    type: 'text',
+                    text: `Request ID: ${requestId}\nResponse: ${result}`
+                }]
             };
         } catch (error) {
             return {
-                success: false,
-                error: error.message
+                content: [{
+                    type: 'text',
+                    text: `Error: ${error.message}`
+                }]
             };
         }
     }
 
     async createProject({ name, template = 'nextjs' }) {
         try {
-            const python = spawn('python3', [
-                path.join(__dirname, '../agents/project_manager.py'),
-                'create',
-                name,
-                template
-            ]);
-
-            return new Promise((resolve) => {
-                let output = '';
-                python.stdout.on('data', (data) => output += data);
-                python.on('close', () => {
-                    resolve({ success: true, output });
-                });
-            });
+            const result = await this.runPython('project_manager.py', ['create', name, template]);
+            return {
+                content: [{
+                    type: 'text',
+                    text: result
+                }]
+            };
         } catch (error) {
-            return { success: false, error: error.message };
+            return {
+                content: [{
+                    type: 'text',
+                    text: `Error creating project: ${error.message}`
+                }]
+            };
         }
     }
 
-    async listProjects() {
-        const projects = await this.redis.smembers('projects:list');
-        return { projects: projects.map(p => p.replace('project:', '')) };
+    async triggerOrchestrator(requestId) {
+        return await this.runPython('orchestrator.py', ['process', requestId]);
     }
 
-    async triggerOrchestrator(requestId) {
-        // Launch Python orchestrator for processing
-        const python = spawn('python3', [
-            path.join(__dirname, '../agents/orchestrator.py'),
-            'process',
-            requestId
-        ]);
-
+    async runPython(script, args) {
         return new Promise((resolve, reject) => {
+            const python = spawn('python3', [
+                path.join(__dirname, '../agents', script),
+                ...args
+            ]);
+
             let output = '';
             let error = '';
             
-            python.stdout.on('data', (data) => output += data);
-            python.stderr.on('data', (data) => error += data);
+            python.stdout.on('data', (data) => output += data.toString());
+            python.stderr.on('data', (data) => error += data.toString());
             
             python.on('close', (code) => {
                 if (code === 0) {
                     resolve(output.trim());
                 } else {
-                    reject(new Error(error));
+                    reject(new Error(error || `Process exited with code ${code}`));
                 }
             });
         });
     }
 
     async start() {
-        await this.redis.connect();
-        const port = process.env.MCP_PORT || 3000;
-        
-        this.server.listen(port, () => {
-            console.log(`DBot MCP Server running on port ${port}`);
-            console.log('Ready for @dbot integration in any MCP-capable application');
-        });
+        const transport = new StdioServerTransport();
+        await this.server.connect(transport);
+        console.error('DBot MCP Server started');
     }
 }
 
-// Start server
 const server = new DBotMCPServer();
 server.start().catch(console.error);
-
-module.exports = DBotMCPServer;

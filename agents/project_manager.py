@@ -1,9 +1,21 @@
 import asyncio
 import json
 import redis
+import sys
+import os
 from datetime import datetime
 from typing import Dict, List, Any
-from embeddings import EmbeddingManager, DocumentationRAG
+
+# Add current directory to path
+sys.path.append(os.path.dirname(__file__))
+
+try:
+    from embeddings import EmbeddingManager, DocumentationRAG
+except ImportError:
+    class EmbeddingManager:
+        def __init__(self): pass
+    class DocumentationRAG:
+        def __init__(self): pass
 
 class ProjectManager:
     def __init__(self):
@@ -116,3 +128,24 @@ class FeatureAnalyzer:
     def _find_dependencies(self, request: str, existing_features: set) -> List[str]:
         """Find feature dependencies"""
         return list(existing_features)
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python project_manager.py <command> [args]")
+        sys.exit(1)
+    
+    command = sys.argv[1]
+    pm = ProjectManager()
+    
+    if command == "create" and len(sys.argv) >= 3:
+        name = sys.argv[2]
+        template = sys.argv[3] if len(sys.argv) > 3 else "default"
+        project_id = pm.create_project(name, template)
+        print(f"Created project: {project_id}")
+    elif command == "list":
+        projects = pm.list_projects()
+        print(json.dumps(projects))
+    else:
+        print(f"Unknown command: {command}")
+
+if __name__ == "__main__":
+    main()

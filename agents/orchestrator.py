@@ -1,12 +1,32 @@
 import asyncio
 import json
 import redis
+import sys
+import os
 from datetime import datetime
 from typing import Dict, List, Any
 
+# Add current directory to path for imports
+sys.path.append(os.path.dirname(__file__))
+
+try:
+    from embeddings import EmbeddingManager, DocumentationRAG
+except ImportError:
+    # Fallback if embeddings not available
+    class EmbeddingManager:
+        def __init__(self): pass
+    class DocumentationRAG:
+        def __init__(self): pass
+
 class Orchestrator:
     def __init__(self):
-        self.redis = redis.Redis(host='localhost', port=6379, decode_responses=True)
+        try:
+            self.redis = redis.Redis(host='localhost', port=6379, decode_responses=True)
+            self.redis.ping()  # Test connection
+        except Exception as e:
+            print(f"Redis connection failed: {e}")
+            sys.exit(1)
+            
         self.active_projects = {}
 
     async def conduct_stack_interview(self, project_id: str) -> Dict[str, str]:
@@ -18,7 +38,6 @@ class Orchestrator:
             'mobile': 'Mobile app? (flutter/react-native/expo/none)'
         }
         
-        # Store interview for later processing
         self.redis.hset(f"project:{project_id}:interview", mapping=questions)
         return questions
 
@@ -34,45 +53,40 @@ class Orchestrator:
         self.redis.hset(f"project:{project_id}:style", mapping=style_questions)
         return style_questions
 
-    async def analyze_feature_request(self, request: str, project_id: str) -> Dict[str, Any]:
-        """Analyze incoming feature request for integration"""
-        existing_features = self.redis.smembers(f"project:{project_id}:features")
-        
-        analysis = {
-            'feature_type': self._classify_feature(request),
-            'is_extension': self._check_if_extension(request, existing_features),
-            'dependencies': self._find_dependencies(request, existing_features),
-            'conflicts': self._detect_conflicts(request, existing_features)
-        }
-        
-        return analysis
+    async def process_request(self, request_id: str) -> str:
+        """Process request from MCP server"""
+        try:
+            request_data = self.redis.hgetall(f"request:{request_id}")
+            if not request_data:
+                return "Request not found"
+            
+            request = request_data.get('request', '')
+            
+            # Simple processing for now
+            response = f"Processing: {request}"
+            
+            # Update status
+            self.redis.hset(f"request:{request_id}", "status", "completed")
+            
+            return response
+            
+        except Exception as e:
+            return f"Error processing request: {str(e)}"
 
-    def _classify_feature(self, request: str) -> str:
-        """Classify feature type based on request"""
-        keywords = {
-            'auth': ['authentication', 'login', 'user', 'signup'],
-            'dashboard': ['dashboard', 'charts', 'analytics'],
-            'api': ['api', 'endpoint', 'rest']
-        }
-        
-        for feature_type, words in keywords.items():
-            if any(word in request.lower() for word in words):
-                return feature_type
-        return 'general'
-
-    def _check_if_extension(self, request: str, existing_features: set) -> bool:
-        """Check if request extends existing feature"""
-        # Simplified logic - would use semantic similarity in production
-        return len(existing_features) > 0
-
-    def _find_dependencies(self, request: str, existing_features: set) -> List[str]:
-        """Find feature dependencies"""
-        return list(existing_features)  # Simplified
-
-    def _detect_conflicts(self, request: str, existing_features: set) -> List[str]:
-        """Detect potential conflicts"""
-        return []  # Simplified
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python orchestrator.py <command> [args]")
+        sys.exit(1)
+    
+    command = sys.argv[1]
+    orchestrator = Orchestrator()
+    
+    if command == "process" and len(sys.argv) >= 3:
+        request_id = sys.argv[2]
+        result = asyncio.run(orchestrator.process_request(request_id))
+        print(result)
+    else:
+        print(f"Unknown command: {command}")
 
 if __name__ == "__main__":
-    orchestrator = Orchestrator()
-    print("Orchestrator started")
+    main()
