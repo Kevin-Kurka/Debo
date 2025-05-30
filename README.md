@@ -31,8 +31,6 @@ Add to any MCP-capable application:
 Use `@dbot` in chat or call the `dbot` tool directly.
 
 ## Commands
-- `dbot` - Main development assistant
-- `create_project` - Initialize project with interviews
-- `list_projects` - Show managed projects
+- `dbot` - Single tool for all development tasks
 
 Ready for production use with any MCP-compatible application.

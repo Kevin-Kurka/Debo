@@ -55,18 +55,6 @@ class DBotMCPServer {
                         },
                         required: ['request']
                     }
-                },
-                {
-                    name: 'create_project',
-                    description: 'Create new project',
-                    inputSchema: {
-                        type: 'object',
-                        properties: {
-                            name: { type: 'string', description: 'Project name' },
-                            template: { type: 'string', description: 'Project template' }
-                        },
-                        required: ['name']
-                    }
                 }
             ]
         }));
@@ -74,8 +62,6 @@ class DBotMCPServer {
         this.server.setRequestHandler('tools/call', async (request) => {
             if (request.params.name === 'dbot') {
                 return await this.dbot(request.params.arguments);
-            } else if (request.params.name === 'create_project') {
-                return await this.createProject(request.params.arguments);
             }
             throw new Error(`Unknown tool: ${request.params.name}`);
         });
