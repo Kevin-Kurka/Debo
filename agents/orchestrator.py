@@ -3,6 +3,7 @@ import json
 import redis
 import sys
 import os
+import subprocess
 from datetime import datetime
 from typing import Dict, List, Any
 
@@ -11,12 +12,16 @@ sys.path.append(os.path.dirname(__file__))
 
 try:
     from embeddings import EmbeddingManager, DocumentationRAG
+    from terminal_manager import TerminalManager
 except ImportError:
-    # Fallback if embeddings not available
+    # Fallback if modules not available
     class EmbeddingManager:
         def __init__(self): pass
     class DocumentationRAG:
         def __init__(self): pass
+    class TerminalManager:
+        def __init__(self): pass
+        def execute_command(self, cmd, bg=False): return {"success": True}
 
 class Orchestrator:
     def __init__(self):
@@ -28,6 +33,7 @@ class Orchestrator:
             sys.exit(1)
             
         self.active_projects = {}
+        self.terminal = TerminalManager()
 
     async def conduct_stack_interview(self, project_id: str) -> Dict[str, str]:
         """Conduct tech stack selection interview"""
