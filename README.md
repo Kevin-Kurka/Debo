@@ -2,48 +2,37 @@
 
 ## Quick Start
 ```bash
-git clone https://github.com/your-username/dbot
+git clone https://github.com/Kevin-Kurka/dbot.git
 cd dbot
 npm install
-npm run setup
-npm start
+npm run setup  # Starts server immediately, downloads models in background
 ```
-
-## Usage with Any MCP Application
-Add to your MCP-capable application's configuration:
-```json
-{
-  "dbot": {
-    "command": "node",
-    "args": ["path/to/dbot/src/mcp_server.js"],
-    "env": {
-      "MCP_PORT": "5150"
-    }
-  }
-}
-```
-
-Use `@dbot` in any chat or reference the `dbot` tool directly.
 
 ## Features
 - Multi-project management with Redis persistence
-- Vision-guided style onboarding
+- Vision-guided style onboarding  
 - Tech stack auto-detection and documentation RAG
 - Feature analysis and integration
 - Git branch management for parallel development
 - Model schema translation (TS/Python/SQL)
 - Local embedding model for fast similarity search
 
+## MCP Integration
+Add to any MCP-capable application:
+```json
+{
+  "dbot": {
+    "command": "node",
+    "args": ["path/to/dbot/src/mcp_server.js"]
+  }
+}
+```
+
+Use `@dbot` in chat or call the `dbot` tool directly.
+
 ## Commands
-- `dbot` - Main development assistant tool
-- `create_project` - Initialize new project with interviews
-- `list_projects` - Show all managed projects
+- `dbot` - Main development assistant
+- `create_project` - Initialize project with interviews
+- `list_projects` - Show managed projects
 
-## Architecture
-- **MCP Server** (Node.js) - Cursor integration
-- **Orchestrator** (Python) - Request routing and interviews
-- **Agent Pool** - Specialized coding agents with Ollama
-- **Redis Stack** - State persistence and vector search
-- **Local Models** - No API dependencies
-
-Ready for production use with Cursor IDE.
+Ready for production use with any MCP-compatible application.

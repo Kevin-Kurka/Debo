@@ -8,10 +8,10 @@
   },
   "scripts": {
     "setup": "bash scripts/setup.sh",
-    "start": "node src/mcp_server.js",
+    "start": "echo '✅ DBot MCP Server ready' && node src/mcp_server.js",
     "dev": "nodemon src/mcp_server.js",
     "test": "echo \"Tests coming soon\"",
-    "postinstall": "echo \"Run 'npm run setup' to configure environment\""
+    "postinstall": "echo '🚀 Run: npm run setup'"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
