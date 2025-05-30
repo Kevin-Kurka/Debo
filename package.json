@@ -1,0 +1,40 @@
+{
+  "name": "dbot",
+  "version": "1.0.0",
+  "description": "Development Bot MCP Server with RAG documentation and parallel agents",
+  "main": "src/server.js",
+  "bin": {
+    "dbot": "./bin/dbot.js"
+  },
+  "scripts": {
+    "setup": "bash scripts/setup.sh",
+    "start": "node src/mcp_server.js",
+    "dev": "nodemon src/mcp_server.js",
+    "test": "echo \"Tests coming soon\"",
+    "postinstall": "echo \"Run 'npm run setup' to configure environment\""
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "redis": "^4.6.0",
+    "langchain": "^0.2.0",
+    "commander": "^11.0.0",
+    "dotenv": "^16.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
+  },
+  "keywords": [
+    "mcp",
+    "development",
+    "agents",
+    "ollama",
+    "rag",
+    "tdd"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/dbot"
+  }
+}
