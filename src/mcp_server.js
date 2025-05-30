@@ -3,6 +3,7 @@ const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio
 const redis = require('redis');
 const { spawn } = require('child_process');
 const path = require('path');
+const DependencyInstaller = require('./dependency_installer');
 
 class DBotMCPServer {
     constructor() {
@@ -15,8 +16,19 @@ class DBotMCPServer {
             }
         });
         
+        this.dependencyInstaller = new DependencyInstaller();
         this.setupRedis();
         this.setupTools();
+        this.ensureDependencies();
+    }
+
+    async ensureDependencies() {
+        try {
+            await this.dependencyInstaller.checkAndInstallAll();
+            console.error('✅ All dependencies ready');
+        } catch (error) {
+            console.error('⚠️ Dependency installation issues:', error.message);
+        }
     }
 
     async setupRedis() {
@@ -64,6 +76,8 @@ class DBotMCPServer {
                 return await this.dbot(request.params.arguments);
             } else if (request.params.name === 'create_project') {
                 return await this.createProject(request.params.arguments);
+            } else if (request.params.name === 'execute_command') {
+                return await this.executeCommand(request.params.arguments);
             }
             throw new Error(`Unknown tool: ${request.params.name}`);
         });
@@ -157,3 +171,61 @@ class DBotMCPServer {
 
 const server = new DBotMCPServer();
 server.start().catch(console.error);
+                },
+                {
+                    name: 'execute_command',
+                    description: 'Execute terminal command via DBot',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            command: { type: 'string', description: 'Terminal command to execute' },
+                            background: { type: 'boolean', description: 'Run in background' }
+                        },
+                        required: ['command']
+                    }
+                }
+
+    async executeCommand({ command, background = false }) {
+        try {
+            const result = await this.runCommand(command, background);
+            return {
+                content: [{
+                    type: 'text',
+                    text: `Command: ${command}\nResult: ${JSON.stringify(result, null, 2)}`
+                }]
+            };
+        } catch (error) {
+            return {
+                content: [{
+                    type: 'text',
+                    text: `Command failed: ${error.message}`
+                }]
+            };
+        }
+    }
+
+    async runCommand(command, background = false) {
+        return new Promise((resolve, reject) => {
+            const child = spawn('sh', ['-c', command]);
+            
+            if (background) {
+                resolve({ status: 'running', pid: child.pid });
+                return;
+            }
+            
+            let stdout = '';
+            let stderr = '';
+            
+            child.stdout.on('data', (data) => stdout += data.toString());
+            child.stderr.on('data', (data) => stderr += data.toString());
+            
+            child.on('close', (code) => {
+                resolve({
+                    success: code === 0,
+                    stdout: stdout.trim(),
+                    stderr: stderr.trim(),
+                    exitCode: code
+                });
+            });
+        });
+    }
