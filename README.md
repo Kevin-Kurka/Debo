@@ -17,7 +17,7 @@ Add to your MCP-capable application's configuration:
     "command": "node",
     "args": ["path/to/dbot/src/mcp_server.js"],
     "env": {
-      "MCP_PORT": "3000"
+      "MCP_PORT": "5150"
     }
   }
 }
