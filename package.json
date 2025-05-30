@@ -1,6 +1,7 @@
 {
   "name": "dbot",
   "version": "1.0.0",
+  "type": "module",
   "description": "Development Bot MCP Server with RAG documentation and parallel agents",
   "main": "src/server.js",
   "bin": {
@@ -14,7 +15,7 @@
     "postinstall": "echo '🚀 Run: npm run setup'"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^0.5.0",
     "redis": "^4.6.0",
     "commander": "^11.0.0",
     "dotenv": "^16.0.0"
