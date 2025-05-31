@@ -49,7 +49,22 @@ install_deps
 
 # Start Redis
 echo "📦 Starting Redis..."
-docker run -d --name redis-stack -p 6379:6379 redis/redis-stack-server 2>/dev/null || echo "✅ Redis running"
+if ! pgrep redis-server > /dev/null; then
+    if command -v redis-server &> /dev/null; then
+        redis-server &
+    else
+        echo "Installing Redis..."
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            brew install redis
+            brew services start redis
+        else
+            sudo apt-get install -y redis-server
+            sudo systemctl start redis-server
+            sudo systemctl enable redis-server
+        fi
+    fi
+fi
+echo "✅ Redis running"
 
 # Install Python deps
 echo "🐍 Installing Python dependencies..."
@@ -65,13 +80,34 @@ echo "✅ DBot ready (PID: $MCP_PID)"
 echo "🔗 Installing to MCP applications..."
 node scripts/auto_install_mcp.cjs
 
-# Download models in background
+# Download models in background with error handling
 echo "📥 Downloading models in background..."
 {
-    ollama pull qwen2.5-vl:32b > /dev/null 2>&1 && echo "✅ Vision model ready"
-    ollama pull deepseek-r1:1.5b > /dev/null 2>&1 && echo "✅ Reasoning model ready"  
-    ollama pull devstral:latest > /dev/null 2>&1 && echo "✅ Coding model ready"
-    echo "🎉 All models downloaded!"
+    echo "🔄 Downloading vision model..."
+    if ollama pull qwen2.5-vl:32b 2>&1; then
+        echo "✅ Vision model ready"
+    else
+        echo "❌ Vision model failed - trying smaller alternative"
+        ollama pull qwen2.5-vl:7b 2>&1 && echo "✅ Vision model (7B) ready"
+    fi
+    
+    echo "🔄 Downloading reasoning model..."
+    if ollama pull deepseek-r1:1.5b 2>&1; then
+        echo "✅ Reasoning model ready"
+    else
+        echo "❌ Reasoning model failed"
+    fi
+    
+    echo "🔄 Downloading coding model..."
+    if ollama pull devstral:latest 2>&1; then
+        echo "✅ Coding model ready"
+    else
+        echo "❌ Coding model failed"
+    fi
+    
+    echo "🎉 Model downloads complete!"
+    # Notify menu bar app
+    osascript -e 'display notification "DBot models ready" with title "DBot"' 2>/dev/null || true
 } &
 
 echo ""

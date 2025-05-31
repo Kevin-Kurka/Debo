@@ -1,0 +1,793 @@
+#!/bin/bash
+
+# Debo - Autonomous Development System
+# Smart Installation Script with Error Recovery
+
+set -euo pipefail
+
+# Script variables
+SCRIPT_VERSION="2.1.0"
+SCRIPT_URL="https://raw.githubusercontent.com/your-username/debo/main/install.sh"
+REPO_URL="https://github.com/your-username/debo.git"
+INSTALL_DIR="${DEBO_INSTALL_DIR:-$HOME/debo}"
+TEMP_DIR="/tmp/debo-install-$$"
+LOG_FILE="$TEMP_DIR/install.log"
+PROGRESS_FILE="$TEMP_DIR/progress"
+SCRIPT_MODE=""
+DEBUG="${DEBO_DEBUG:-false}"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+BOLD='\033[1m'
+
+# Display Debo banner
+show_banner() {
+    echo -e "${CYAN}"
+    cat << 'EOF'
+    ██████╗ ███████╗██████╗  ██████╗ 
+    ██╔══██╗██╔════╝██╔══██╗██╔═══██╗
+    ██║  ██║█████╗  ██████╔╝██║   ██║
+    ██║  ██║██╔══╝  ██╔══██╗██║   ██║
+    ██████╔╝███████╗██████╔╝╚██████╔╝
+    ╚═════╝ ╚══════╝╚═════╝  ╚═════╝ 
+
+    Autonomous Development System v2.0
+EOF
+    echo -e "${NC}"
+    echo -e "${BOLD}🤖 Installing your AI development team...${NC}\n"
+}
+
+# Logging functions
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG_FILE"
+    [[ "$DEBUG" == "true" ]] && echo -e "${PURPLE}[DEBUG]${NC} $*"
+}
+
+error_exit() {
+    echo -e "${RED}❌ Error: $1${NC}" >&2
+    log "ERROR: $1"
+    echo -e "\n${YELLOW}💡 Troubleshooting:${NC}"
+    
+    # Provide context-specific help
+    case "$1" in
+        *"source files"*)
+            echo "   • The installer is downloading Debo from GitHub"
+            echo "   • Check your internet connection"
+            echo "   • Try manually cloning: git clone $REPO_URL"
+            ;;
+        *"permission"*)
+            echo "   • You may need to run with different permissions"
+            echo "   • Check directory ownership: ls -la $INSTALL_DIR"
+            echo "   • Try a different install directory: export DEBO_INSTALL_DIR=/path/to/dir"
+            ;;
+        *"Node.js"*)
+            echo "   • Node.js 18+ is required"
+            echo "   • Install via https://nodejs.org or your package manager"
+            echo "   • macOS: brew install node"
+            echo "   • Ubuntu: curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -"
+            ;;
+        *"Redis"*)
+            echo "   • Redis is required for state management"
+            echo "   • macOS: brew install redis && brew services start redis"
+            echo "   • Ubuntu: sudo apt install redis-server && sudo systemctl start redis"
+            ;;
+    esac
+    
+    echo -e "\n${CYAN}📋 Installation log saved to: $LOG_FILE${NC}"
+    echo -e "${CYAN}📞 Get help at: https://github.com/your-username/debo/issues${NC}"
+    
+    # Cleanup on error
+    cleanup
+    exit 1
+}
+
+success() {
+    echo -e "${GREEN}✅ $1${NC}"
+    log "SUCCESS: $1"
+}
+
+info() {
+    echo -e "${BLUE}ℹ️  $1${NC}"
+    log "INFO: $1"
+}
+
+warning() {
+    echo -e "${YELLOW}⚠️  $1${NC}"
+    log "WARNING: $1"
+}
+
+# Progress tracking
+update_progress() {
+    echo "$1" > "$PROGRESS_FILE"
+    local percent=$1
+    local filled=$((percent / 3))
+    local empty=$((33 - filled))
+    
+    printf "\r["
+    printf "%${filled}s" | tr ' ' '█'
+    printf "%${empty}s" | tr ' ' '░'
+    printf "] %d%% - %s" "$percent" "$2"
+}
+
+# Cleanup function
+cleanup() {
+    if [[ -d "$TEMP_DIR" ]]; then
+        rm -rf "$TEMP_DIR"
+    fi
+}
+
+# Trap cleanup on exit
+trap cleanup EXIT
+
+# Detect how the script is being run
+detect_script_mode() {
+    if [[ -t 0 ]]; then
+        if [[ -f "./package.json" ]] && grep -q '"name": "debo"' ./package.json 2>/dev/null; then
+            SCRIPT_MODE="local"
+            log "Script running in local mode (from Debo directory)"
+        else
+            SCRIPT_MODE="download"
+            log "Script running in download mode"
+        fi
+    else
+        SCRIPT_MODE="curl"
+        log "Script running via curl/pipe"
+    fi
+}
+
+# Check if running as root
+check_root() {
+    if [[ $EUID -eq 0 ]]; then
+        error_exit "This script should not be run as root"
+    fi
+}
+
+# Detect OS
+detect_os() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        OS="macos"
+        OS_NAME="macOS"
+        PACKAGE_MANAGER="brew"
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        OS="linux"
+        if [[ -f /etc/debian_version ]]; then
+            OS_NAME="Debian/Ubuntu"
+            PACKAGE_MANAGER="apt"
+        elif [[ -f /etc/redhat-release ]]; then
+            OS_NAME="RedHat/CentOS"
+            PACKAGE_MANAGER="yum"
+        else
+            OS_NAME="Linux"
+            PACKAGE_MANAGER="unknown"
+        fi
+    else
+        error_exit "Unsupported operating system: $OSTYPE"
+    fi
+    
+    info "Detected $OS_NAME"
+    log "OS detected: $OS_NAME ($OS, $PACKAGE_MANAGER)"
+}
+
+# Check system requirements
+check_system_requirements() {
+    info "Checking system requirements..."
+    
+    # Check memory
+    if [[ "$OS" == "macos" ]]; then
+        TOTAL_MEM=$(sysctl -n hw.memsize | awk '{print int($1/1024/1024/1024)}')
+    else
+        TOTAL_MEM=$(free -g | awk '/^Mem:/{print $2}')
+    fi
+    
+    if [[ $TOTAL_MEM -lt 8 ]]; then
+        warning "System has ${TOTAL_MEM}GB RAM. Recommended: 8GB+"
+    else
+        success "Memory: ${TOTAL_MEM}GB available"
+    fi
+    
+    # Check disk space
+    AVAILABLE_SPACE=$(df -BG "$HOME" | awk 'NR==2 {print int($4)}')
+    if [[ $AVAILABLE_SPACE -lt 10 ]]; then
+        warning "Only ${AVAILABLE_SPACE}GB disk space available. Recommended: 10GB+"
+    else
+        success "Disk space: ${AVAILABLE_SPACE}GB available"
+    fi
+}
+
+# Check for required commands
+check_command() {
+    if ! command -v "$1" &> /dev/null; then
+        return 1
+    fi
+    return 0
+}
+
+# Install package based on OS
+install_package() {
+    local package=$1
+    info "Installing $package..."
+    
+    case "$PACKAGE_MANAGER" in
+        brew)
+            brew install "$package" || error_exit "Failed to install $package"
+            ;;
+        apt)
+            sudo apt-get update -qq
+            sudo apt-get install -y "$package" || error_exit "Failed to install $package"
+            ;;
+        yum)
+            sudo yum install -y "$package" || error_exit "Failed to install $package"
+            ;;
+        *)
+            error_exit "Unknown package manager. Please install $package manually"
+            ;;
+    esac
+}
+
+# Install Node.js
+install_nodejs() {
+    if ! check_command node; then
+        info "Installing Node.js..."
+        
+        if [[ "$OS" == "macos" ]]; then
+            if check_command brew; then
+                brew install node
+            else
+                error_exit "Please install Homebrew first: https://brew.sh"
+            fi
+        elif [[ "$PACKAGE_MANAGER" == "apt" ]]; then
+            curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+            sudo apt-get install -y nodejs
+        else
+            error_exit "Please install Node.js 18+ manually: https://nodejs.org"
+        fi
+        
+        success "Node.js installed"
+    else
+        local node_version=$(node --version | cut -d'v' -f2)
+        local major_version=$(echo "$node_version" | cut -d'.' -f1)
+        
+        if [[ $major_version -lt 18 ]]; then
+            error_exit "Node.js 18+ required. Current version: v$node_version"
+        else
+            success "Node.js already installed (v$node_version)"
+        fi
+    fi
+}
+
+# Install Redis
+install_redis() {
+    if ! check_command redis-server && ! check_command redis-cli; then
+        info "Installing Redis..."
+        
+        case "$OS" in
+            macos)
+                brew install redis
+                brew services start redis
+                ;;
+            linux)
+                if [[ "$PACKAGE_MANAGER" == "apt" ]]; then
+                    sudo apt-get update -qq
+                    sudo apt-get install -y redis-server
+                    sudo systemctl start redis-server
+                    sudo systemctl enable redis-server
+                else
+                    install_package redis
+                fi
+                ;;
+        esac
+        
+        success "Redis installed"
+    else
+        success "Redis already installed"
+        
+        # Ensure Redis is running
+        if ! pgrep -x "redis-server" > /dev/null; then
+            info "Starting Redis..."
+            if [[ "$OS" == "macos" ]]; then
+                brew services start redis
+            else
+                sudo systemctl start redis-server 2>/dev/null || sudo service redis-server start
+            fi
+        fi
+    fi
+    
+    # Test Redis connection
+    if redis-cli ping &>/dev/null; then
+        success "Redis is running"
+    else
+        warning "Redis may not be running properly"
+    fi
+}
+
+# Install Ollama
+install_ollama() {
+    if ! check_command ollama; then
+        info "Installing Ollama..."
+        
+        # Download and run Ollama installer
+        if curl -fsSL https://ollama.ai/install.sh | sh; then
+            success "Ollama installed"
+        else
+            error_exit "Failed to install Ollama"
+        fi
+    else
+        success "Ollama already installed"
+    fi
+    
+    # Start Ollama service
+    info "Starting Ollama service..."
+    if [[ "$OS" == "macos" ]]; then
+        # On macOS, Ollama runs as an app
+        if ! pgrep -x "ollama" > /dev/null; then
+            nohup ollama serve > /dev/null 2>&1 &
+            sleep 3
+        fi
+    else
+        # On Linux, try systemd first
+        if systemctl is-active --quiet ollama; then
+            success "Ollama service is running"
+        else
+            nohup ollama serve > /dev/null 2>&1 &
+            sleep 3
+        fi
+    fi
+    
+    # Verify Ollama is accessible
+    if curl -s http://localhost:11434/api/tags &>/dev/null; then
+        success "Ollama API is accessible"
+    else
+        warning "Ollama API may not be accessible"
+    fi
+}
+
+# Download or update Debo
+setup_debo_repository() {
+    info "Setting up Debo repository..."
+    
+    # Handle different installation modes
+    case "$SCRIPT_MODE" in
+        local)
+            # Already in Debo directory
+            INSTALL_DIR=$(pwd)
+            success "Using existing Debo directory"
+            ;;
+        *)
+            # Need to clone/download
+            if [[ -d "$INSTALL_DIR" ]]; then
+                info "Existing installation found at $INSTALL_DIR"
+                read -p "Update existing installation? (y/N) " -n 1 -r
+                echo
+                if [[ $REPLY =~ ^[Yy]$ ]]; then
+                    cd "$INSTALL_DIR"
+                    git pull origin main || warning "Failed to update repository"
+                    success "Repository updated"
+                else
+                    error_exit "Installation cancelled"
+                fi
+            else
+                info "Cloning Debo repository..."
+                
+                # Ensure parent directory exists
+                mkdir -p "$(dirname "$INSTALL_DIR")"
+                
+                if git clone "$REPO_URL" "$INSTALL_DIR"; then
+                    success "Repository cloned"
+                else
+                    error_exit "Failed to clone repository. Check your internet connection"
+                fi
+            fi
+            cd "$INSTALL_DIR"
+            ;;
+    esac
+    
+    # Verify we have the source files
+    if [[ ! -f "package.json" ]]; then
+        error_exit "Debo source files not found in $INSTALL_DIR"
+    fi
+}
+
+# Install Node.js dependencies
+install_dependencies() {
+    info "Installing Node.js dependencies..."
+    
+    # Clean install to avoid conflicts
+    rm -rf node_modules package-lock.json
+    
+    if npm install; then
+        success "Dependencies installed"
+    else
+        error_exit "Failed to install Node.js dependencies"
+    fi
+}
+
+# Setup configuration
+setup_configuration() {
+    info "Setting up configuration..."
+    
+    # Create .env file if it doesn't exist
+    if [[ ! -f .env ]]; then
+        cat > .env << EOF
+# Debo Configuration
+# Generated on $(date)
+
+# Redis Configuration
+REDIS_URL=redis://localhost:6379
+
+# LLM Provider Configuration
+LLM_PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434
+
+# Model Configuration
+THINKING_MODEL=qwen2.5:14b
+FAST_MODEL=qwen2.5:7b
+VISION_MODEL=qwen2.5-vl:7b
+REASONING_MODEL=deepseek-r1:1.5b
+
+# Server Configuration
+WEBSOCKET_PORT=3001
+NODE_ENV=production
+LOG_LEVEL=info
+
+# Feature Flags
+ENABLE_QUALITY_GATES=true
+ENABLE_AUTO_REVISION=true
+ENABLE_GIT_WORKFLOW=true
+ENABLE_CONFIDENCE_SCORING=true
+EOF
+        success "Configuration file created"
+    else
+        success "Configuration file already exists"
+    fi
+    
+    # Create necessary directories
+    mkdir -p logs projects temp
+    success "Project directories created"
+}
+
+# Download AI models
+download_models() {
+    info "Downloading AI models (this will run in background)..."
+    
+    # Create model download script
+    cat > "$INSTALL_DIR/download_models.sh" << 'EOF'
+#!/bin/bash
+
+# Model download script with progress tracking
+MODELS=(
+    "qwen2.5:14b:Thinking model"
+    "qwen2.5:7b:Fast execution model"
+    "qwen2.5-vl:7b:Vision model"
+    "deepseek-r1:1.5b:Reasoning model"
+)
+
+echo "🤖 Downloading AI models for Debo..."
+echo "This may take 10-30 minutes depending on your connection"
+echo ""
+
+download_model() {
+    local model=$1
+    local desc=$2
+    
+    echo "📥 Downloading $desc ($model)..."
+    if ollama pull "$model" 2>&1; then
+        echo "✅ $desc ready"
+        return 0
+    else
+        echo "❌ Failed to download $desc"
+        return 1
+    fi
+}
+
+# Download models sequentially
+failed_models=()
+for model_info in "${MODELS[@]}"; do
+    IFS=':' read -r model size desc <<< "$model_info"
+    if ! download_model "$model" "$desc"; then
+        failed_models+=("$model")
+    fi
+    echo ""
+done
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+if [ ${#failed_models[@]} -eq 0 ]; then
+    echo "🎉 All models downloaded successfully!"
+else
+    echo "⚠️  Some models failed to download:"
+    for model in "${failed_models[@]}"; do
+        echo "  - $model"
+    done
+    echo ""
+    echo "You can retry with: ollama pull <model-name>"
+fi
+
+# Send notification on macOS
+if command -v osascript &> /dev/null; then
+    osascript -e 'display notification "AI models are ready!" with title "Debo Setup Complete"' 2>/dev/null || true
+fi
+
+# Send notification on Linux
+if command -v notify-send &> /dev/null; then
+    notify-send "Debo Setup Complete" "AI models are ready!" 2>/dev/null || true
+fi
+EOF
+    
+    chmod +x "$INSTALL_DIR/download_models.sh"
+    
+    # Start model download in background
+    nohup "$INSTALL_DIR/download_models.sh" > "$INSTALL_DIR/model_download.log" 2>&1 &
+    local download_pid=$!
+    
+    success "Model download started (PID: $download_pid)"
+    info "Monitor progress: tail -f $INSTALL_DIR/model_download.log"
+}
+
+# Setup shell integration
+setup_shell_integration() {
+    info "Setting up shell integration..."
+    
+    # Create bin directory if needed
+    mkdir -p "$INSTALL_DIR/bin"
+    
+    # Determine the correct debo script based on what exists
+    local mcp_script="src/mcp_server.js"
+    if [[ -f "src/mcp_server_v2.js" ]]; then
+        mcp_script="src/mcp_server_v2.js"
+    fi
+    
+    # Create debo command wrapper
+    cat > "$INSTALL_DIR/bin/debo" << EOF
+#!/bin/bash
+# Debo command wrapper
+
+export DEBO_HOME="$INSTALL_DIR"
+cd "\$DEBO_HOME"
+
+# Ensure Redis is running
+if ! redis-cli ping &>/dev/null; then
+    echo "Starting Redis..."
+    if [[ "\$(uname)" == "Darwin" ]]; then
+        brew services start redis 2>/dev/null || redis-server --daemonize yes
+    else
+        sudo systemctl start redis-server 2>/dev/null || redis-server --daemonize yes
+    fi
+fi
+
+# Ensure Ollama is running
+if ! curl -s http://localhost:11434/api/tags &>/dev/null; then
+    echo "Starting Ollama..."
+    nohup ollama serve > /dev/null 2>&1 &
+    sleep 2
+fi
+
+# Run Debo
+exec node "$mcp_script" "\$@"
+EOF
+    
+    chmod +x "$INSTALL_DIR/bin/debo"
+    
+    # Add to PATH
+    local shell_rc=""
+    if [[ -n "$ZSH_VERSION" ]] || [[ -f "$HOME/.zshrc" ]]; then
+        shell_rc="$HOME/.zshrc"
+    elif [[ -n "$BASH_VERSION" ]] || [[ -f "$HOME/.bashrc" ]]; then
+        shell_rc="$HOME/.bashrc"
+    elif [[ -f "$HOME/.bash_profile" ]]; then
+        shell_rc="$HOME/.bash_profile"
+    fi
+    
+    if [[ -n "$shell_rc" ]]; then
+        # Remove old PATH entries
+        sed -i.bak '/debo\/bin/d' "$shell_rc" 2>/dev/null || true
+        
+        # Add new PATH entry
+        echo "" >> "$shell_rc"
+        echo "# Debo - Autonomous Development System" >> "$shell_rc"
+        echo "export PATH=\"$INSTALL_DIR/bin:\$PATH\"" >> "$shell_rc"
+        
+        success "Added debo to PATH in $shell_rc"
+    else
+        warning "Could not determine shell configuration file"
+        info "Add this to your shell configuration: export PATH=\"$INSTALL_DIR/bin:\$PATH\""
+    fi
+}
+
+# Run initial setup
+run_initial_setup() {
+    info "Running initial setup..."
+    
+    if [[ -f "scripts/setup.js" ]]; then
+        if npm run setup; then
+            success "Initial setup completed"
+        else
+            warning "Initial setup had some issues"
+        fi
+    else
+        warning "Setup script not found, skipping"
+    fi
+}
+
+# Test installation
+test_installation() {
+    info "Testing installation..."
+    
+    local tests_passed=0
+    local tests_total=0
+    
+    # Test Node.js
+    ((tests_total++))
+    if node --version &>/dev/null; then
+        success "Node.js test passed"
+        ((tests_passed++))
+    else
+        warning "Node.js test failed"
+    fi
+    
+    # Test Redis
+    ((tests_total++))
+    if redis-cli ping 2>/dev/null | grep -q PONG; then
+        success "Redis test passed"
+        ((tests_passed++))
+    else
+        warning "Redis test failed"
+    fi
+    
+    # Test Ollama
+    ((tests_total++))
+    if curl -s http://localhost:11434/api/tags &>/dev/null; then
+        success "Ollama test passed"
+        ((tests_passed++))
+    else
+        warning "Ollama test failed"
+    fi
+    
+    # Test Debo module loading
+    ((tests_total++))
+    if node -e "require('./package.json')" 2>/dev/null; then
+        success "Debo module test passed"
+        ((tests_passed++))
+    else
+        warning "Debo module test failed"
+    fi
+    
+    info "Tests passed: $tests_passed/$tests_total"
+}
+
+# Generate MCP configuration
+generate_mcp_config() {
+    info "Generating MCP configuration..."
+    
+    local config_file="$HOME/.debo-mcp-config.json"
+    
+    cat > "$config_file" << EOF
+{
+  "mcpServers": {
+    "debo": {
+      "command": "node",
+      "args": ["$INSTALL_DIR/src/mcp_server.js"],
+      "env": {
+        "DEBO_HOME": "$INSTALL_DIR"
+      }
+    }
+  }
+}
+EOF
+    
+    success "MCP configuration saved to $config_file"
+}
+
+# Main installation flow
+main() {
+    # Create temp directory for logs
+    mkdir -p "$TEMP_DIR"
+    
+    # Initialize log
+    log "Debo installation started at $(date)"
+    log "Script version: $SCRIPT_VERSION"
+    
+    # Show banner
+    show_banner
+    
+    # Detect environment
+    detect_script_mode
+    check_root
+    detect_os
+    check_system_requirements
+    
+    # Install prerequisites
+    update_progress 10 "Installing prerequisites..."
+    echo
+    
+    if [[ "$OS" == "macos" ]] && ! check_command brew; then
+        info "Installing Homebrew..."
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    fi
+    
+    install_nodejs
+    update_progress 20 "Node.js ready"
+    
+    install_redis
+    update_progress 30 "Redis ready"
+    
+    install_ollama
+    update_progress 40 "Ollama ready"
+    
+    # Setup Debo
+    echo
+    update_progress 50 "Setting up Debo..."
+    setup_debo_repository
+    
+    update_progress 60 "Installing dependencies..."
+    install_dependencies
+    
+    update_progress 70 "Configuring system..."
+    setup_configuration
+    
+    update_progress 80 "Setting up commands..."
+    setup_shell_integration
+    
+    update_progress 90 "Running initial setup..."
+    run_initial_setup
+    
+    # Final steps
+    update_progress 95 "Downloading AI models..."
+    download_models
+    
+    update_progress 98 "Testing installation..."
+    test_installation
+    
+    update_progress 99 "Generating configurations..."
+    generate_mcp_config
+    
+    update_progress 100 "Complete!"
+    echo
+    
+    # Show completion message
+    echo
+    echo -e "${GREEN}🎉 Installation Complete!${NC}"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo
+    success "Debo Autonomous Development System is ready!"
+    echo
+    echo -e "${BOLD}📍 Installation Details:${NC}"
+    echo "   • Location: $INSTALL_DIR"
+    echo "   • Config: $INSTALL_DIR/.env"
+    echo "   • Logs: $INSTALL_DIR/logs/"
+    echo "   • Models: Downloading in background"
+    echo
+    echo -e "${BOLD}🚀 Quick Start:${NC}"
+    echo "   1. Restart your terminal or run: source ${shell_rc:-~/.bashrc}"
+    echo "   2. Test the installation: debo --help"
+    echo "   3. Create your first project: debo create my-app \"Build a todo app\""
+    echo
+    echo -e "${BOLD}📊 Web Monitor:${NC}"
+    echo "   • URL: http://localhost:3001"
+    echo "   • Start: debo monitor"
+    echo
+    echo -e "${BOLD}🔧 MCP Integration:${NC}"
+    echo "   Add to your MCP client configuration:"
+    echo "   {"
+    echo "     \"debo\": {"
+    echo "       \"command\": \"node\","
+    echo "       \"args\": [\"$INSTALL_DIR/src/mcp_server.js\"]"
+    echo "     }"
+    echo "   }"
+    echo
+    echo -e "${BOLD}📚 Resources:${NC}"
+    echo "   • Documentation: $INSTALL_DIR/README.md"
+    echo "   • Model progress: tail -f $INSTALL_DIR/model_download.log"
+    echo "   • Get help: https://github.com/your-username/debo"
+    echo
+    
+    log "Installation completed successfully"
+}
+
+# Run main installation
+main "$@"

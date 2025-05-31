@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "dbot": {
+      "command": "node",
+      "args": ["/Users/kmk/dbot/src/mcp_server.js"],
+      "env": {}
+    }
+  }
+}
