@@ -40,12 +40,12 @@ curl -fsSL https://raw.githubusercontent.com/Kevin-Kurka/Debo/main/install-oneli
 Debo implements a hierarchical multi-agent system that mirrors a Fortune 500 engineering org. Think Conway's Law, but intentional:
 
 ```
-CTO (Thinking Agent - qwen2.5:14b)
+CTO (Thinking Agent)
 ├── Engineering Manager (Resource allocation via Hungarian algorithm)
 ├── Solution Architect (Designs with SOLID principles baked in)
 └── Product Manager (Converts your rambling into actual requirements)
     │
-    └── Fast Execution Layer (qwen2.5:7b)
+    └── Fast Execution Layer (Execution Agents)
         ├── Backend Dev (Implements without the "clever" code)
         ├── Frontend Dev (No, it won't use 47 npm packages for left-pad)
         ├── QA Engineer (Catches the edge cases you forgot)
