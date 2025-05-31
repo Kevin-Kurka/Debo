@@ -9,7 +9,7 @@ pkill -f "menubar" 2>/dev/null
 sleep 2
 
 # Start MCP server
-cd /Users/kmk/dbot
+cd $HOME/debo
 node src/mcp_server.js &
 
 # Start menubar

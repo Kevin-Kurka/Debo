@@ -140,7 +140,7 @@ async function updateTrayMenu() {
         {
             label: 'Restart DBot',
             click: () => {
-                exec('cd /Users/kmk/dbot && ./scripts/restart.sh', (error) => {
+                exec('cd $HOME/debo && ./scripts/restart.sh', (error) => {
                     if (error) console.error('Restart failed:', error);
                 });
             }

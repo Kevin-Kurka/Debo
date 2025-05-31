@@ -1,8 +1,8 @@
 {
   "mcpServers": {
-    "dbot": {
+    "debo": {
       "command": "node",
-      "args": ["/Users/kmk/dbot/src/mcp_server.js"],
+      "args": ["$HOME/debo/src/mcp_server.js"],
       "env": {}
     }
   }

@@ -25,13 +25,13 @@ class DependencyInstaller {
         await this.setupEnvironment();
         await this.startMenubar();
         
-        console.log('✅ DBot running - Available via @dbot in Cursor');
+        console.log('✅ Debo running - Available via @debo in Cursor');
         return this.installationStatus;
     }
 
     async ensureNodeModules() {
         console.log('📦 Installing dependencies...');
-        await execAsync('npm install winston zod', { cwd: '/Users/kmk/dbot' });
+        await execAsync('npm install winston zod', { cwd: process.cwd() });
         this.installationStatus.node_modules = true;
     }
 
@@ -82,9 +82,9 @@ class DependencyInstaller {
             } catch {}
 
             config.mcpServers = config.mcpServers || {};
-            config.mcpServers.dbot = {
+            config.mcpServers.debo = {
                 command: "node",
-                args: ["/Users/kmk/dbot/src/mcp_server.js"],
+                args: ["$HOME/debo/src/mcp_server.js"],
                 env: {},
                 disabled: false
             };
@@ -99,13 +99,13 @@ class DependencyInstaller {
 
     async setupEnvironment() {
         console.log('⚙️ Setting environment...');
-        await execAsync('cp .env.example .env || true', { cwd: '/Users/kmk/dbot' });
+        await execAsync('cp .env.example .env || true', { cwd: process.cwd() });
     }
 
     async startMenubar() {
         console.log('🖥️ Starting menubar...');
         try {
-            execAsync('node src/menubar.js &', { cwd: '/Users/kmk/dbot' });
+            execAsync('node src/menubar.js &', { cwd: process.cwd() });
             this.installationStatus.menubar = true;
         } catch (error) {
             console.log('⚠️ Menubar start failed');

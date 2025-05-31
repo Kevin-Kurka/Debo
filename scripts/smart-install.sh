@@ -5,7 +5,7 @@ echo "🚀 DBot Smart Installer Starting..."
 
 # Check if we're in the right directory
 if [ ! -f "package.json" ]; then
-    echo "❌ Please run from the dbot project directory"
+    echo "❌ Please run from the debo project directory"
     exit 1
 fi
 

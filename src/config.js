@@ -12,7 +12,7 @@ export const config = {
   server: {
     port: parseInt(process.env.PORT || '3000'),
     host: process.env.HOST || 'localhost',
-    name: process.env.SERVER_NAME || 'dbot',
+    name: process.env.SERVER_NAME || 'debo',
     version: process.env.SERVER_VERSION || '1.0.0'
   },
   redis: {
