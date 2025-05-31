@@ -1,10 +1,10 @@
-import { Notification } from 'electron';
 import activityStreamer from './activity-streamer.js';
 import { config } from './config.js';
+import chalk from 'chalk';
 
 class NotificationManager {
   constructor() {
-    this.isEnabled = false;
+    this.isEnabled = true; // Always enabled for terminal notifications
     this.lastNotification = null;
     this.setupListeners();
   }
@@ -12,7 +12,7 @@ class NotificationManager {
   setupListeners() {
     activityStreamer.on('status', (status) => {
       if (this.isEnabled && status.message) {
-        this.showNotification(status.message);
+        this.showTerminalNotification(status.message);
       }
     });
   }
@@ -22,21 +22,18 @@ class NotificationManager {
     return this.isEnabled;
   }
 
-  showNotification(message) {
+  showTerminalNotification(message) {
     if (!this.isEnabled) return;
     
-    if (this.lastNotification) {
-      this.lastNotification.close();
-    }
+    const timestamp = new Date().toLocaleTimeString();
+    console.log(chalk.blue(`[${timestamp}]`) + chalk.cyan(' 🔔 ') + chalk.white(message));
+    
+    this.lastNotification = { message, timestamp };
+  }
 
-    this.lastNotification = new Notification({
-      title: 'DBot Activity',
-      body: message,
-      silent: true,
-      timeoutType: 'default'
-    });
-
-    this.lastNotification.show();
+  showNotification(message) {
+    // Legacy method for backward compatibility
+    this.showTerminalNotification(message);
   }
 
   getSettings() {

@@ -10,7 +10,7 @@ class DependencyInstaller {
     constructor() {
         this.installationStatus = {
             node_modules: false, ollama: false, python: false,
-            redis: false, cursor_mcp: false, menubar: false
+            redis: false, cursor_mcp: false
         };
     }
 
@@ -23,7 +23,7 @@ class DependencyInstaller {
         await this.ensureRedis();
         await this.setupCursorMCP();
         await this.setupEnvironment();
-        await this.startMenubar();
+        console.log('✅ Debo terminal interface ready!');
         
         console.log('✅ Debo running - Available via @debo in Cursor');
         return this.installationStatus;
@@ -102,15 +102,7 @@ class DependencyInstaller {
         await execAsync('cp .env.example .env || true', { cwd: process.cwd() });
     }
 
-    async startMenubar() {
-        console.log('🖥️ Starting menubar...');
-        try {
-            execAsync('node src/menubar.js &', { cwd: process.cwd() });
-            this.installationStatus.menubar = true;
-        } catch (error) {
-            console.log('⚠️ Menubar start failed');
-        }
-    }
+    // Terminal-only interface - no GUI components needed
 
     async commandExists(command) {
         try {
