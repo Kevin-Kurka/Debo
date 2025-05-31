@@ -1,0 +1,429 @@
+#!/usr/bin/env node
+
+/**
+ * Debo - Natural Language CLI Interface
+ * Autonomous Development System with Claude Code-like terminal experience
+ */
+
+const readline = require('readline');
+const chalk = require('chalk');
+const boxen = require('boxen');
+const figlet = require('figlet');
+const ora = require('ora');
+const { UnifiedOrchestrator } = require('../src/core/unified-orchestrator.js');
+const { EnhancedTaskManager } = require('../src/database/task-manager.js');
+const { LLMProvider } = require('../src/infrastructure/llm-provider.js');
+const { TerminalUI } = require('../src/terminal/rich-ui.js');
+const { ModelEvolution } = require('../src/ai/model-evolution.js');
+const { MCPManager } = require('../src/mcp/mcp-manager.js');
+const logger = require('../src/logger.js');
+
+class DeboNaturalCLI {
+  constructor() {
+    this.taskManager = null;
+    this.llmProvider = null;
+    this.orchestrator = null;
+    this.terminalUI = null;
+    this.modelEvolution = null;
+    this.mcpManager = null;
+    this.currentProject = null;
+    this.conversationContext = [];
+    
+    this.rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+      prompt: chalk.cyan('debo> ')
+    });
+    
+    this.setupSignalHandlers();
+  }
+
+  async init() {
+    try {
+      // Show startup banner
+      this.showBanner();
+      
+      const spinner = ora('Initializing Debo...').start();
+      
+      // Initialize core systems
+      this.taskManager = new EnhancedTaskManager();
+      await this.taskManager.connect();
+      spinner.text = 'Connected to Redis...';
+      
+      this.llmProvider = new LLMProvider();
+      await this.llmProvider.init();
+      spinner.text = 'LLM Provider ready...';
+      
+      this.orchestrator = new UnifiedOrchestrator(this.taskManager, this.llmProvider);
+      await this.orchestrator.init();
+      spinner.text = 'Agent orchestrator online...';
+      
+      this.terminalUI = new TerminalUI(this.taskManager);
+      await this.terminalUI.init();
+      spinner.text = 'Terminal UI initialized...';
+      
+      this.modelEvolution = new ModelEvolution(this.llmProvider);
+      await this.modelEvolution.init();
+      spinner.text = 'Model evolution system ready...';
+      
+      this.mcpManager = new MCPManager();
+      await this.mcpManager.init();
+      spinner.text = 'MCP manager initialized...';
+      
+      spinner.succeed('Debo is ready for autonomous development!');
+      
+      // Show initial status
+      await this.showSystemStatus();
+      
+      // Start interaction loop
+      this.startInteractionLoop();
+      
+    } catch (error) {
+      console.error(chalk.red('Failed to initialize Debo:'), error);
+      process.exit(1);
+    }
+  }
+
+  showBanner() {
+    console.clear();
+    console.log(chalk.cyan(figlet.textSync('DEBO', {
+      font: 'Standard',
+      horizontalLayout: 'default'
+    })));
+    
+    console.log(chalk.gray('Autonomous Development System v2.0.0'));
+    console.log(chalk.gray('Type your requests in natural language\n'));
+  }
+
+  async showSystemStatus() {
+    const status = await this.orchestrator.getSystemHealth();
+    const projects = await this.orchestrator.getAllProjectsStatus();
+    
+    console.log(boxen(
+      chalk.white('System Status\n\n') +
+      chalk.green(`✅ Agents: ${status.activeAgents} active\n`) +
+      chalk.green(`✅ Models: ${status.availableModels.length} loaded\n`) +
+      chalk.green(`✅ Projects: ${projects.length} total\n`) +
+      chalk.blue(`📊 Redis: ${status.redisStatus}\n`) +
+      chalk.blue(`🤖 Ollama: ${status.ollamaStatus}`),
+      {
+        padding: 1,
+        margin: 1,
+        borderStyle: 'round',
+        borderColor: 'cyan',
+        title: '🚀 Debo Status',
+        titleAlignment: 'center'
+      }
+    ));
+  }
+
+  startInteractionLoop() {
+    this.rl.prompt();
+    
+    this.rl.on('line', async (input) => {
+      const trimmed = input.trim();
+      
+      if (!trimmed) {
+        this.rl.prompt();
+        return;
+      }
+      
+      // Handle special commands
+      if (await this.handleSpecialCommands(trimmed)) {
+        this.rl.prompt();
+        return;
+      }
+      
+      // Process natural language input
+      await this.processNaturalLanguage(trimmed);
+      this.rl.prompt();
+    });
+  }
+
+  async handleSpecialCommands(input) {
+    const cmd = input.toLowerCase();
+    
+    switch (cmd) {
+      case 'exit':
+      case 'quit':
+      case 'q':
+        await this.gracefulShutdown();
+        return true;
+        
+      case 'clear':
+      case 'cls':
+        console.clear();
+        this.showBanner();
+        return true;
+        
+      case 'status':
+        await this.showSystemStatus();
+        return true;
+        
+      case 'projects':
+        await this.showProjects();
+        return true;
+        
+      case 'tasks':
+        await this.showActiveTasks();
+        return true;
+        
+      case 'models':
+        await this.showAvailableModels();
+        return true;
+        
+      case 'help':
+        this.showHelp();
+        return true;
+        
+      default:
+        return false;
+    }
+  }
+
+  async processNaturalLanguage(input) {
+    try {
+      // Add to conversation context
+      this.conversationContext.push({
+        role: 'user',
+        content: input,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Analyze intent
+      const intent = await this.analyzeIntent(input);
+      
+      const spinner = ora('Processing request...').start();
+      
+      switch (intent.type) {
+        case 'create_project':
+          await this.handleCreateProject(intent, spinner);
+          break;
+          
+        case 'develop_feature':
+          await this.handleDevelopFeature(intent, spinner);
+          break;
+          
+        case 'project_status':
+          await this.handleProjectStatus(intent, spinner);
+          break;
+          
+        case 'deploy':
+          await this.handleDeploy(intent, spinner);
+          break;
+          
+        case 'setup_mcp':
+          await this.handleSetupMCP(intent, spinner);
+          break;
+          
+        case 'upgrade_models':
+          await this.handleUpgradeModels(intent, spinner);
+          break;
+          
+        case 'general_query':
+          await this.handleGeneralQuery(intent, spinner);
+          break;
+          
+        default:
+          spinner.fail('Could not understand the request');
+          console.log(chalk.yellow('💡 Try being more specific about what you want to do'));
+      }
+      
+    } catch (error) {
+      console.error(chalk.red('Error processing request:'), error.message);
+    }
+  }
+
+  async analyzeIntent(input) {
+    const prompt = `
+Analyze this user request and determine the intent:
+"${input}"
+
+Context: ${JSON.stringify(this.conversationContext.slice(-3))}
+Current project: ${this.currentProject || 'none'}
+
+Return JSON with:
+{
+  "type": "create_project|develop_feature|project_status|deploy|setup_mcp|upgrade_models|general_query",
+  "project": "project name if mentioned",
+  "details": "extracted details",
+  "confidence": 0.0-1.0
+}`;
+
+    const response = await this.llmProvider.generateResponse(prompt, 'fast');
+    
+    try {
+      return JSON.parse(response);
+    } catch {
+      return {
+        type: 'general_query',
+        details: input,
+        confidence: 0.5
+      };
+    }
+  }
+
+  async handleCreateProject(intent, spinner) {
+    spinner.text = 'Creating project...';
+    
+    const projectId = await this.orchestrator.initializeProject(
+      intent.project || 'new-project',
+      intent.details,
+      intent.stack
+    );
+    
+    this.currentProject = intent.project || 'new-project';
+    
+    spinner.succeed(`Project "${this.currentProject}" created successfully!`);
+    
+    // Show real-time progress
+    await this.terminalUI.showProjectCreation(projectId);
+  }
+
+  async handleDevelopFeature(intent, spinner) {
+    if (!this.currentProject && !intent.project) {
+      spinner.fail('No project specified. Please specify a project or create one first.');
+      return;
+    }
+    
+    const project = intent.project || this.currentProject;
+    spinner.text = `Adding feature to ${project}...`;
+    
+    const taskId = await this.orchestrator.processFeatureRequest(project, intent.details);
+    
+    spinner.succeed(`Feature development started for "${project}"!`);
+    
+    // Show real-time progress
+    await this.terminalUI.showFeatureDevelopment(project, taskId);
+  }
+
+  async handleProjectStatus(intent, spinner) {
+    const project = intent.project || this.currentProject;
+    
+    if (!project) {
+      spinner.text = 'Getting all projects status...';
+      const projects = await this.orchestrator.getAllProjectsStatus();
+      spinner.succeed('All projects status retrieved');
+      
+      await this.terminalUI.showAllProjects(projects);
+    } else {
+      spinner.text = `Getting status for ${project}...`;
+      const status = await this.orchestrator.getProjectStatus(project);
+      spinner.succeed(`Status for "${project}" retrieved`);
+      
+      await this.terminalUI.showProjectStatus(project, status);
+    }
+  }
+
+  async handleSetupMCP(intent, spinner) {
+    spinner.text = 'Setting up MCP server...';
+    
+    const result = await this.mcpManager.setupMCPServer(intent.details);
+    
+    if (result.success) {
+      spinner.succeed(`MCP server "${result.name}" configured successfully!`);
+      console.log(chalk.green(`🔗 Add this to your MCP client configuration:`));
+      console.log(chalk.white(JSON.stringify(result.config, null, 2)));
+    } else {
+      spinner.fail(`Failed to setup MCP server: ${result.error}`);
+    }
+  }
+
+  async handleUpgradeModels(intent, spinner) {
+    spinner.text = 'Checking for model upgrades...';
+    
+    const upgrades = await this.modelEvolution.checkForUpgrades();
+    
+    if (upgrades.length === 0) {
+      spinner.succeed('All models are up to date!');
+      return;
+    }
+    
+    spinner.text = `Found ${upgrades.length} model upgrades...`;
+    
+    for (const upgrade of upgrades) {
+      spinner.text = `Upgrading ${upgrade.current} to ${upgrade.new}...`;
+      await this.modelEvolution.performUpgrade(upgrade);
+    }
+    
+    spinner.succeed(`Successfully upgraded ${upgrades.length} models!`);
+    
+    // Show updated model list
+    await this.showAvailableModels();
+  }
+
+  async showProjects() {
+    const projects = await this.orchestrator.getAllProjectsStatus();
+    await this.terminalUI.showAllProjects(projects);
+  }
+
+  async showActiveTasks() {
+    const tasks = await this.taskManager.getActiveTasks();
+    await this.terminalUI.showActiveTasks(tasks);
+  }
+
+  async showAvailableModels() {
+    const models = await this.llmProvider.getAvailableModels();
+    await this.terminalUI.showModels(models);
+  }
+
+  showHelp() {
+    console.log(boxen(
+      chalk.white('Natural Language Commands\n\n') +
+      chalk.yellow('Project Management:\n') +
+      '• "Create a React todo app called my-app"\n' +
+      '• "Add user authentication to my-app"\n' +
+      '• "Show me the status of my-app"\n' +
+      '• "Deploy my-app to production"\n\n' +
+      chalk.yellow('System Management:\n') +
+      '• "Setup an MCP server for GitHub"\n' +
+      '• "Check for model upgrades"\n' +
+      '• "Connect to OpenAI API"\n\n' +
+      chalk.yellow('Quick Commands:\n') +
+      '• status, projects, tasks, models\n' +
+      '• clear, help, exit',
+      {
+        padding: 1,
+        margin: 1,
+        borderStyle: 'round',
+        borderColor: 'yellow',
+        title: '💡 Help',
+        titleAlignment: 'center'
+      }
+    ));
+  }
+
+  setupSignalHandlers() {
+    process.on('SIGINT', async () => {
+      console.log(chalk.yellow('\n🛑 Shutting down Debo...'));
+      await this.gracefulShutdown();
+    });
+  }
+
+  async gracefulShutdown() {
+    try {
+      if (this.orchestrator) {
+        await this.orchestrator.cleanup();
+      }
+      if (this.taskManager) {
+        await this.taskManager.disconnect();
+      }
+      console.log(chalk.green('👋 Goodbye! Debo has been shut down gracefully.'));
+      process.exit(0);
+    } catch (error) {
+      console.error(chalk.red('Error during shutdown:'), error);
+      process.exit(1);
+    }
+  }
+}
+
+// Start the CLI if this file is run directly
+if (require.main === module) {
+  const cli = new DeboNaturalCLI();
+  cli.init().catch(error => {
+    console.error(chalk.red('Failed to start Debo:'), error);
+    process.exit(1);
+  });
+}
+
+module.exports = DeboNaturalCLI;

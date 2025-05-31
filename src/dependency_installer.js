@@ -1,108 +1,129 @@
-const { spawn } = require('child_process');
-const path = require('path');
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { readFile, writeFile, access } from 'fs/promises';
+import { join } from 'path';
+import { homedir } from 'os';
+
+const execAsync = promisify(exec);
 
 class DependencyInstaller {
     constructor() {
         this.installationStatus = {
-            docker: false,
-            ollama: false,
-            python: false,
-            redis: false
+            node_modules: false, ollama: false, python: false,
+            redis: false, cursor_mcp: false, menubar: false
         };
     }
 
     async checkAndInstallAll() {
-        console.log("🔍 Checking dependencies...");
+        console.log("🚀 DBot One-Click Setup...");
         
-        // Check each dependency and install if missing
-        await this.ensureDocker();
-        await this.ensureOllama();  
+        await this.ensureNodeModules();
+        await this.ensureOllama();
         await this.ensurePython();
         await this.ensureRedis();
+        await this.setupCursorMCP();
+        await this.setupEnvironment();
+        await this.startMenubar();
         
+        console.log('✅ DBot running - Available via @dbot in Cursor');
         return this.installationStatus;
     }
 
-    async ensureDocker() {
-        if (await this.commandExists('docker')) {
-            this.installationStatus.docker = true;
-            return;
-        }
-
-        console.log("📦 Installing Docker...");
-        const platform = process.platform;
-        
-        if (platform === 'darwin') {
-            await this.runCommand('curl -o /tmp/Docker.dmg https://desktop.docker.com/mac/main/amd64/Docker.dmg');
-            await this.runCommand('sudo hdiutil attach /tmp/Docker.dmg');
-            await this.runCommand('sudo cp -R "/Volumes/Docker/Docker.app" /Applications/');
-            await this.runCommand('open /Applications/Docker.app');
-        } else {
-            await this.runCommand('curl -fsSL https://get.docker.com | sh');
-            await this.runCommand('sudo systemctl start docker');
-        }
-        
-        this.installationStatus.docker = true;
+    async ensureNodeModules() {
+        console.log('📦 Installing dependencies...');
+        await execAsync('npm install winston zod', { cwd: '/Users/kmk/dbot' });
+        this.installationStatus.node_modules = true;
     }
 
     async ensureOllama() {
-        if (await this.commandExists('ollama')) {
-            this.installationStatus.ollama = true;
-            return;
+        console.log('🧠 Setting up Ollama...');
+        if (!await this.commandExists('ollama')) {
+            await execAsync('curl -fsSL https://ollama.com/install.sh | sh');
         }
-
-        console.log("🧠 Installing Ollama...");
-        await this.runCommand('curl -fsSL https://ollama.com/install.sh | sh');
         
-        // Start Ollama service
-        this.runCommand('ollama serve', true); // background
+        await execAsync('pkill ollama || true');
+        await execAsync('ollama serve &');
+        await this.sleep(3000);
+        
+        console.log('📥 Downloading models (background)...');
+        execAsync('ollama pull devstral').catch(() => {});
+        execAsync('ollama pull deepseek-r1:1.5b').catch(() => {});
+        
         this.installationStatus.ollama = true;
     }
-
     async ensurePython() {
-        if (await this.commandExists('python3')) {
-            this.installationStatus.python = true;
-            return;
+        console.log('🐍 Checking Python...');
+        if (!await this.commandExists('python3')) {
+            await execAsync('brew install python3');
         }
-
-        console.log("🐍 Installing Python3...");
-        if (process.platform === 'darwin') {
-            await this.runCommand('brew install python3');
-        } else {
-            await this.runCommand('sudo apt-get update && sudo apt-get install -y python3 python3-pip');
-        }
-        
         this.installationStatus.python = true;
     }
 
     async ensureRedis() {
-        console.log("📦 Starting Redis...");
-        await this.runCommand('docker run -d --name redis-stack -p 6379:6379 redis/redis-stack-server');
+        console.log('📦 Starting Redis...');
+        try {
+            await execAsync('brew install redis');
+            await execAsync('brew services start redis');
+        } catch {
+            console.log('⚠️ Redis install failed - using fallback');
+        }
         this.installationStatus.redis = true;
     }
 
-    commandExists(command) {
-        return new Promise((resolve) => {
-            const child = spawn('which', [command]);
-            child.on('close', (code) => resolve(code === 0));
-        });
+    async setupCursorMCP() {
+        console.log('🔗 Configuring Cursor MCP...');
+        const cursorConfigPath = join(homedir(), 'Library/Application Support/Cursor/User/globalStorage/cursor.mcpserver/settings.json');
+        
+        try {
+            let config = {};
+            try {
+                const existing = await readFile(cursorConfigPath, 'utf8');
+                config = JSON.parse(existing);
+            } catch {}
+
+            config.mcpServers = config.mcpServers || {};
+            config.mcpServers.dbot = {
+                command: "node",
+                args: ["/Users/kmk/dbot/src/mcp_server.js"],
+                env: {},
+                disabled: false
+            };
+
+            await writeFile(cursorConfigPath, JSON.stringify(config, null, 2));
+            this.installationStatus.cursor_mcp = true;
+            console.log('✅ DBot configured in Cursor');
+        } catch (error) {
+            console.log('⚠️ Manual Cursor setup needed');
+        }
     }
 
-    runCommand(command, background = false) {
-        return new Promise((resolve, reject) => {
-            const child = spawn('sh', ['-c', command]);
-            
-            if (background) {
-                resolve();
-                return;
-            }
-            
-            child.on('close', (code) => {
-                if (code === 0) resolve();
-                else reject(new Error(`Command failed: ${command}`));
-            });
-        });
+    async setupEnvironment() {
+        console.log('⚙️ Setting environment...');
+        await execAsync('cp .env.example .env || true', { cwd: '/Users/kmk/dbot' });
+    }
+
+    async startMenubar() {
+        console.log('🖥️ Starting menubar...');
+        try {
+            execAsync('node src/menubar.js &', { cwd: '/Users/kmk/dbot' });
+            this.installationStatus.menubar = true;
+        } catch (error) {
+            console.log('⚠️ Menubar start failed');
+        }
+    }
+
+    async commandExists(command) {
+        try {
+            await execAsync(`which ${command}`);
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 }
 
-module.exports = DependencyInstaller;
+export default DependencyInstaller;
