@@ -307,7 +307,7 @@ export class HelpSystem {
     // Footer
     console.log(chalk.gray('\nFor detailed help on any command, run: ') + chalk.white('debo help <command>'));
     console.log(chalk.gray('Real-time monitoring available at: ') + chalk.white('http://localhost:3001'));
-    console.log(chalk.gray('Documentation: ') + chalk.white('https://github.com/your-username/debo\n'));
+    console.log(chalk.gray('Documentation: ') + chalk.white('https://github.com/Kevin-Kurka/Debo\n'));
   }
 
   showCommandHelp(commandName) {

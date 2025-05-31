@@ -320,7 +320,7 @@ export class TerminalCommandHandler {
       commands,
       message: 'Debo Command Reference',
       webMonitor: 'http://localhost:3001',
-      documentation: 'https://github.com/your-username/debo'
+      documentation: 'https://github.com/Kevin-Kurka/Debo'
     };
   }
 

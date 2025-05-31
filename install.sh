@@ -7,8 +7,8 @@ set -euo pipefail
 
 # Script variables
 SCRIPT_VERSION="2.1.0"
-SCRIPT_URL="https://raw.githubusercontent.com/your-username/debo/main/install.sh"
-REPO_URL="https://github.com/your-username/debo.git"
+SCRIPT_URL="https://raw.githubusercontent.com/Kevin-Kurka/Debo/main/install.sh"
+REPO_URL="https://github.com/Kevin-Kurka/Debo.git"
 INSTALL_DIR="${DEBO_INSTALL_DIR:-$HOME/debo}"
 TEMP_DIR="/tmp/debo-install-$$"
 LOG_FILE="$TEMP_DIR/install.log"
@@ -80,7 +80,7 @@ error_exit() {
     esac
     
     echo -e "\n${CYAN}📋 Installation log saved to: $LOG_FILE${NC}"
-    echo -e "${CYAN}📞 Get help at: https://github.com/your-username/debo/issues${NC}"
+    echo -e "${CYAN}📞 Get help at: https://github.com/Kevin-Kurka/Debo/issues${NC}"
     
     # Cleanup on error
     cleanup
@@ -783,7 +783,7 @@ main() {
     echo -e "${BOLD}📚 Resources:${NC}"
     echo "   • Documentation: $INSTALL_DIR/README.md"
     echo "   • Model progress: tail -f $INSTALL_DIR/model_download.log"
-    echo "   • Get help: https://github.com/your-username/debo"
+    echo "   • Get help: https://github.com/Kevin-Kurka/Debo"
     echo
     
     log "Installation completed successfully"

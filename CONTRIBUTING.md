@@ -52,7 +52,7 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 
 ```bash
 # Clone your fork
-git clone https://github.com/your-username/debo.git
+git clone https://github.com/Kevin-Kurka/Debo.git
 cd debo
 
 # Install dependencies

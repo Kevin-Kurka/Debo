@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # Debo One-Liner Installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/your-username/debo/main/install-oneliner.sh | bash
-# or: wget -qO- https://raw.githubusercontent.com/your-username/debo/main/install-oneliner.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/Kevin-Kurka/Debo/main/install-oneliner.sh | bash
+# or: wget -qO- https://raw.githubusercontent.com/Kevin-Kurka/Debo/main/install-oneliner.sh | bash
 
 set -euo pipefail
 
 # Script configuration
-REPO_URL="https://github.com/your-username/debo.git"
-INSTALL_SCRIPT_URL="https://raw.githubusercontent.com/your-username/debo/main/install.sh"
+REPO_URL="https://github.com/Kevin-Kurka/Debo.git"
+INSTALL_SCRIPT_URL="https://raw.githubusercontent.com/Kevin-Kurka/Debo/main/install.sh"
 INSTALL_DIR="${DEBO_INSTALL_DIR:-$HOME/debo}"
 TEMP_INSTALLER="/tmp/debo-installer-$$.sh"
 
@@ -41,7 +41,7 @@ handle_error() {
     echo "   ./install.sh"
     echo ""
     echo "3. Get help:"
-    echo "   https://github.com/your-username/debo/issues"
+    echo "   https://github.com/Kevin-Kurka/Debo/issues"
     
     # Cleanup
     rm -f "$TEMP_INSTALLER"

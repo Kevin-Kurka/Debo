@@ -14,7 +14,7 @@ const readline = require('readline');
 
 // Configuration
 const CONFIG = {
-  repoUrl: 'https://github.com/your-username/debo.git',
+  repoUrl: 'https://github.com/Kevin-Kurka/Debo.git',
   installDir: process.env.DEBO_INSTALL_DIR || path.join(os.homedir(), 'debo'),
   models: {
     thinking: 'qwen2.5:14b',
@@ -481,7 +481,7 @@ async function main() {
     console.log('   • Check the error message above');
     console.log('   • Ensure you have internet connection');
     console.log('   • Try running with: DEBO_DEBUG=true node install.js');
-    console.log('   • Get help: https://github.com/your-username/debo/issues');
+    console.log('   • Get help: https://github.com/Kevin-Kurka/Debo/issues');
     process.exit(1);
   }
 }

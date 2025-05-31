@@ -30,7 +30,7 @@ That's it. Natural language. No more Stack Overflow archaeology. No more reading
 ## 🏃‍♂️ One-Line Installation (Because We're Not Savages)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/your-username/debo/main/install-oneliner.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Kevin-Kurka/Debo/main/install-oneliner.sh | bash
 ```
 
 *"You got knocked the f*** out!"* - Your manual deployment process after meeting Debo
@@ -222,8 +222,8 @@ MIT - Because Debo takes what he wants, but he's not a monster.
   <p><i>"That's my development system, punk!"</i></p>
   <p>Built by developers who were tired of developing</p>
   <p>
-    <a href="https://github.com/your-username/debo/issues">Report Bug</a> •
-    <a href="https://github.com/your-username/debo/discussions">Discussions</a> •
+    <a href="https://github.com/Kevin-Kurka/Debo/issues">Report Bug</a> •
+    <a href="https://github.com/Kevin-Kurka/Debo/discussions">Discussions</a> •
     <a href="https://xkcd.com/927/">Standards</a>
   </p>
 </div>

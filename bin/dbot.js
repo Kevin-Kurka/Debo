@@ -6,15 +6,15 @@ const fs = require('fs');
 const path = require('path');
 
 program
-  .name('dbot')
-  .description('Development Bot MCP Server')
-  .version('1.0.0');
+  .name('debo')
+  .description('Debo Autonomous Development System')
+  .version('2.0.0');
 
 program
   .command('create-project <name>')
-  .description('Create new DBot project')
+  .description('Create new Debo project')
   .action(async (name) => {
-    console.log(`Creating DBot project: ${name}`);
+    console.log(`Creating Debo project: ${name}`);
     
     // Create project directory
     fs.mkdirSync(name, { recursive: true });
@@ -37,9 +37,9 @@ program
 
 program
   .command('setup')
-  .description('Setup DBot environment')
+  .description('Setup Debo environment')
   .action(() => {
-    console.log('Setting up DBot environment...');
+    console.log('Setting up Debo environment...');
     
     // Start Redis Stack
     execSync('docker run -d --name redis-stack -p 6379:6379 redis/redis-stack-server');

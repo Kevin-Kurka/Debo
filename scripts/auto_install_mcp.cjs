@@ -3,8 +3,8 @@ const path = require('path');
 const os = require('os');
 
 class MCPAutoInstaller {
-    constructor(dbotPath) {
-        this.dbotPath = dbotPath;
+    constructor(deboPath) {
+        this.deboPath = deboPath;
     }
 
     findMCPConfigs() {
@@ -48,9 +48,9 @@ class MCPAutoInstaller {
 
             if (!config.mcpServers) config.mcpServers = {};
             
-            config.mcpServers.dbot = {
+            config.mcpServers.debo = {
                 command: "node",
-                args: [path.join(this.dbotPath, "src/mcp_server.js")]
+                args: [path.join(this.deboPath, "src/mcp_server.js")]
             };
 
             fs.mkdirSync(path.dirname(configPath), { recursive: true });
@@ -75,8 +75,8 @@ class MCPAutoInstaller {
 
 // Run if called directly
 if (require.main === module) {
-    const dbotPath = process.argv[2] || path.dirname(__dirname);
-    const installer = new MCPAutoInstaller(dbotPath);
+    const deboPath = process.argv[2] || path.dirname(__dirname);
+    const installer = new MCPAutoInstaller(deboPath);
     const results = installer.autoInstallAll();
     
     console.log("🔧 DBot MCP Installation Report:");
@@ -85,7 +85,7 @@ if (require.main === module) {
     }
     
     if (Object.values(results).some(Boolean)) {
-        console.log("\n🎉 Restart applications to use @dbot");
+        console.log("\n🎉 Restart applications to use @debo");
     }
 }
 

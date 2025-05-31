@@ -4,8 +4,8 @@ import platform
 from pathlib import Path
 
 class MCPAutoInstaller:
-    def __init__(self, dbot_path):
-        self.dbot_path = dbot_path
+    def __init__(self, debo_path):
+        self.debo_path = debo_path
         self.configs = self.find_mcp_configs()
     
     def find_mcp_configs(self):
@@ -57,9 +57,9 @@ class MCPAutoInstaller:
             if 'mcpServers' not in config:
                 config['mcpServers'] = {}
             
-            config['mcpServers']['dbot'] = {
+            config['mcpServers']['debo'] = {
                 "command": "node",
-                "args": [str(self.dbot_path / "src/mcp_server.js")]
+                "args": [str(self.debo_path / "src/mcp_server.js")]
             }
             
             config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -83,14 +83,14 @@ class MCPAutoInstaller:
             if 'tools' not in config:
                 config['tools'] = []
             
-            dbot_tool = {
-                "name": "dbot",
-                "command": ["node", str(self.dbot_path / "src/mcp_server.js")]
+            debo_tool = {
+                "name": "debo",
+                "command": ["node", str(self.debo_path / "src/mcp_server.js")]
             }
             
-            # Remove existing dbot if present
-            config['tools'] = [t for t in config['tools'] if t.get('name') != 'dbot']
-            config['tools'].append(dbot_tool)
+            # Remove existing debo if present
+            config['tools'] = [t for t in config['tools'] if t.get('name') != 'debo']
+            config['tools'].append(debo_tool)
             
             config_path.parent.mkdir(parents=True, exist_ok=True)
             with open(config_path, 'w') as f:
@@ -124,17 +124,17 @@ class MCPAutoInstaller:
             print(f"   {status} {app.title()}")
         
         if any(results.values()):
-            print("\n🎉 Restart your applications to use @dbot")
+            print("\n🎉 Restart your applications to use @debo")
         else:
             print("\n⚠️ No compatible MCP applications found")
 
 def main():
     if len(sys.argv) > 1:
-        dbot_path = Path(sys.argv[1])
+        debo_path = Path(sys.argv[1])
     else:
-        dbot_path = Path(__file__).parent.parent
+        debo_path = Path(__file__).parent.parent
     
-    installer = MCPAutoInstaller(dbot_path)
+    installer = MCPAutoInstaller(debo_path)
     results = installer.auto_install_all()
     installer.print_installation_report(results)
 
