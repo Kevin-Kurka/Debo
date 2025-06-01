@@ -11,15 +11,28 @@
 
 > *"What bike? THAT'S MY BIKE, PUNK!"* - Debo
 > 
-> Just like Debo from Friday, this system will take your development tasks and make them its own. But instead of stealing bikes, it's commandeering your entire SDLC. 
+> This system will take your development tasks and make them its own. But instead of stealing bikes, it's commandeering your entire SDLC. 
 
 ## 🚴 What's Debo?
 
-Remember when you had to actually *write* code? When you had to *think* about architecture? When deployment meant more than just saying "deploy this"? Yeah, Debo's about to take all that. 
+Remember when you had to actually *write* code? When you had to *think* about architecture? When deployment meant more than just saying "deploy this"? Yeah, Debo's takes all that. 
 
 ```bash
-# Old way (what are you, from the 90s?)
+# Old way (3 months ago)
 mkdir my-app && cd my-app && npm init && npm install express && ...
+... boiler plate
+... boiler plate
+... boiler plate
+... some code
+... boiler plate
+... bug fixes
+... boiler plate
+... you anit got no job smokey
+... boiler plate
+... boiler plate
+...
+...
+...
 
 # Debo way
 debo "build me a distributed cache with consistent hashing, but make it web-scale"
@@ -33,9 +46,9 @@ That's it. Natural language. No more Stack Overflow archaeology. No more reading
 curl -fsSL https://raw.githubusercontent.com/Kevin-Kurka/Debo/main/install-oneliner.sh | bash
 ```
 
-*"You got knocked the f*** out!"* - Your manual deployment process after meeting Debo
+*Manual Process --> "You got knocked the f**k out!"* 
 
-## 🧠 The Architecture (For My Fellow Greybeards)
+## 🧠 The Architecture
 
 Debo implements a hierarchical multi-agent system that mirrors a Fortune 500 engineering org. Think Conway's Law, but intentional:
 
@@ -56,7 +69,7 @@ Each agent maintains its own context window, implements backpressure, and yes, w
 
 ## 💬 Natural Language Interface (The Only Interface That Matters)
 
-Stop writing YAML. Stop memorizing CLI flags. Just talk to it like you'd talk to a junior who actually listens:
+Stop writing YAML. Stop memorizing CLI flags. Just talk to it like you you talk to a jr dev that the boss hired because he has 5 fancy degrees and 0 expirence:
 
 ```bash
 # Project creation
@@ -72,7 +85,7 @@ debo "why is my API returning 500s after exactly 1024 requests?"
 debo "deploy this to prod but run the integration tests first"
 ```
 
-*"You want some of this too, old man?"* - Debo to your legacy CI/CD pipeline
+*"You want some of this too, old man?"* - SELECT FROM WHERE...
 
 ## 🛠️ Under the Hood (For the Curious)
 
@@ -109,13 +122,13 @@ Supports everything from "yolo push to prod" to "enterprise change advisory boar
 
 ```yaml
 thinking_layer:
-  - llm: qwen2.5:14b
-  - context: 32k tokens
+  - llm: Best thinking models...
+  - context: ...
   - temperature: 0.3  # We're not writing poetry here
 
 execution_layer:
-  - llm: qwen2.5:7b
-  - context: 8k tokens  
+  - llm: Best execution models...
+  - context: ... 
   - temperature: 0.1  # Deterministic, like it should be
 
 state_management:
@@ -153,8 +166,8 @@ Debo respects `$HOME/.deborc` for the cultured:
 ```bash
 # .deborc
 export DEBO_LLM_PROVIDER=ollama  # or openai if you're feeling spendy
-export DEBO_THINKING_MODEL=qwen2.5:14b
-export DEBO_FAST_MODEL=qwen2.5:7b
+export DEBO_THINKING_MODEL= [dynamic selection]
+export DEBO_FAST_MODEL=[dynamic selection]
 export DEBO_MAX_AGENTS=10  # Prevent fork bombs
 export DEBO_QUALITY_THRESHOLD=0.8  # Lower at your own risk
 ```
@@ -204,13 +217,13 @@ debo "analyze logs" | debo "find anomalies" | debo "generate runbook"
 
 ## 🎬 Why "Debo"?
 
-Because just like the character, this system:
+Because, this system:
 - Takes what it wants (your development tasks)
 - Doesn't ask permission (autonomous execution)
 - Gets things done (usually by force)
 - Has your bike now (and your entire development workflow)
 
-*"Shut up. There's a lot you don't know about me, Craig."* - Debo, probably talking about its advanced ML capabilities
+*"Shut up. There's a lot you don't know about me, Craig."*
 
 ## 📄 License
 
@@ -230,9 +243,8 @@ MIT - Because Debo takes what he wants, but he's not a monster.
 
 ## 🔥 Final Words
 
-Remember: With great automation comes great unemployment... I mean, responsibility. Debo doesn't judge your spaghetti code, it just rewrites it while you sleep.
+Remember: With great automation comes great unemployment... Debo doesn't judge your spaghetti code, it just rewrites it while you sleep.
 
-*"First of all, don't be calling me no Deebo. My name is Debo."* - This system, if you misspell it in your commands
 
 Now stop reading and start delegating. Debo's got work to do.
 
