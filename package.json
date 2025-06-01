@@ -1,15 +1,17 @@
 {
   "name": "debo",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "type": "module",
-  "description": "Debo - Autonomous Development System with Fortune 500 Agent Structure",
+  "description": "Debo - Generic AI System with Dynamic Agent Creation for Any Domain",
   "main": "src/mcp_server.js",
   "bin": {
     "debo": "./bin/debo.js"
   },
   "scripts": {
     "start": "node src/mcp_server.js",
+    "start:generic": "node src/mcp_server_generic.js",
     "dev": "nodemon src/mcp_server.js",
+    "dev:generic": "nodemon src/mcp_server_generic.js",
     "setup": "node scripts/setup.js",
     "test": "jest",
     "test:watch": "jest --watch",

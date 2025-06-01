@@ -1,31 +1,41 @@
 # Debo - "My grandmama gave me that chain!" 🤖
 
 <div align="center">
-  <img src="https://img.shields.io/badge/version-2.0.0-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-3.0.0-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License">
   <img src="https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg" alt="Node">
   <img src="https://img.shields.io/badge/redis-%3E%3D6.0-red.svg" alt="Redis">
+  <img src="https://img.shields.io/badge/status-GENERIC_AI_SYSTEM-purple.svg" alt="Generic">
 </div>
 
 <br>
 
 > *"What bike? THAT'S MY BIKE, PUNK!"* - Debo
 > 
-> Just like Debo from Friday, this system will take your development tasks and make them its own. But instead of stealing bikes, it's commandeering your entire SDLC. 
+> Just like Debo from Friday, this system will take ANY task and make it its own. Software? Legal? Scientific? Business? Debo don't discriminate. 
 
 ## 🚴 What's Debo?
 
-Remember when you had to actually *write* code? When you had to *think* about architecture? When deployment meant more than just saying "deploy this"? Yeah, Debo's about to take all that. 
+**MAJOR UPDATE**: Debo isn't just for coding anymore. It's a generic AI system that creates specialized agents for ANY domain at runtime.
 
 ```bash
-# Old way (what are you, from the 90s?)
-mkdir my-app && cd my-app && npm init && npm install express && ...
+# Software Development (classic Debo)
+debo "build me a distributed cache with consistent hashing"
 
-# Debo way
-debo "build me a distributed cache with consistent hashing, but make it web-scale"
+# Legal Discovery (new Debo)
+debo "create an agent to manage federal court discovery procedures"
+
+# Scientific Research (new Debo)
+debo "I need help designing experiments for enzyme kinetics"
+
+# Business Process (new Debo)
+debo "automate our customer onboarding with compliance checks"
+
+# Literally Anything (new Debo)
+debo "create an agent that helps me [insert your domain here]"
 ```
 
-That's it. Natural language. No more Stack Overflow archaeology. No more reading docs written by people who clearly hate you.
+Natural language. Any domain. Dynamic agent creation. Full Redis data sharing.
 
 ## 🏃‍♂️ One-Line Installation (Because We're Not Savages)
 
@@ -35,54 +45,103 @@ curl -fsSL https://raw.githubusercontent.com/Kevin-Kurka/Debo/main/install-oneli
 
 *"You got knocked the f*** out!"* - Your manual deployment process after meeting Debo
 
-## 🧠 The Architecture (For My Fellow Greybeards)
+## 🧠 The Architecture (Now With Dynamic Agents)
 
-Debo implements a hierarchical multi-agent system that mirrors a Fortune 500 engineering org. Think Conway's Law, but intentional:
+Debo now implements BOTH static agents (for software) AND dynamic agents (for everything else):
 
 ```
-CTO (Thinking Agent - qwen2.5:14b)
-├── Engineering Manager (Resource allocation via Hungarian algorithm)
-├── Solution Architect (Designs with SOLID principles baked in)
-└── Product Manager (Converts your rambling into actual requirements)
-    │
-    └── Fast Execution Layer (qwen2.5:7b)
-        ├── Backend Dev (Implements without the "clever" code)
-        ├── Frontend Dev (No, it won't use 47 npm packages for left-pad)
-        ├── QA Engineer (Catches the edge cases you forgot)
-        └── DevOps (Deploys without crying)
+Generic Orchestrator (NEW!)
+├── Static Software Agents (Original)
+│   ├── CTO, Engineering Manager, Architects
+│   └── Developers, QA, DevOps
+│
+└── Dynamic Domain Agents (Created at Runtime)
+    ├── Legal Agents
+    │   ├── Discovery Specialist
+    │   ├── Contract Analyzer
+    │   └── Compliance Officer
+    ├── Scientific Agents
+    │   ├── Experiment Designer
+    │   ├── Data Analyst
+    │   └── Literature Reviewer
+    ├── Medical Agents
+    │   ├── Diagnosis Assistant
+    │   └── Treatment Planner
+    └── Your Custom Agents
+        └── Whatever you can imagine
 ```
 
-Each agent maintains its own context window, implements backpressure, and yes, we're using Redis for state management because we're not masochists.
+**Key Enhancement**: All agents now use `EnhancedAgentExecutor` with FULL Redis integration. They actually share data now!
 
-## 💬 Natural Language Interface (The Only Interface That Matters)
+## 💬 Natural Language Interface (Now Domain-Agnostic)
 
-Stop writing YAML. Stop memorizing CLI flags. Just talk to it like you'd talk to a junior who actually listens:
+Three powerful tools at your disposal:
 
+### 1. `debo` - Main tool for ANY request
 ```bash
-# Project creation
-debo "spin up a websocket server with JWT auth and rate limiting"
+# Software Development
+debo "build a websocket server with JWT auth"
 
-# Feature addition  
-debo "add a Redis-backed session store with sliding window expiration"
+# Legal Work
+debo "analyze these discovery requests for privilege"
 
-# Debugging
-debo "why is my API returning 500s after exactly 1024 requests?"
+# Scientific Research  
+debo "design an experiment to test drug efficacy"
 
-# Deployment
-debo "deploy this to prod but run the integration tests first"
+# Business Process
+debo "create a customer onboarding workflow"
+
+# Agent Creation
+debo "create an agent that specializes in tax preparation"
 ```
 
-*"You want some of this too, old man?"* - Debo to your legacy CI/CD pipeline
+### 2. `debo_dialogue` - Continue conversations
+```bash
+# When Debo needs clarification
+debo_dialogue --dialogueId "abc123" "Yes, it should handle federal and state taxes"
+```
 
-## 🛠️ Under the Hood (For the Curious)
+### 3. `debo_query` - Query knowledge or data
+```bash
+# Query domain knowledge
+debo_query "What are the discovery deadlines in federal court?"
 
-- **Event Sourcing**: Every agent action is recorded. Full replay capability.
-- **CQRS Pattern**: Commands and queries separated at the orchestrator level.
-- **Saga Pattern**: Distributed transactions across agents with compensating actions.
-- **Circuit Breakers**: Because even AI agents need to fail gracefully.
-- **Backpressure**: Implements reactive streams spec. No agent left behind.
+# Query agent data
+debo_query --agentId "legal_discovery_specialist" "Show all active cases"
+```
 
-The quality gateway runs static analysis (without the false positives that make you want to --no-verify).
+## 🚀 Quick Start (Choose Your Adventure)
+
+### Standard Installation (Software Development)
+```bash
+# One-liner installation
+curl -fsSL https://raw.githubusercontent.com/Kevin-Kurka/Debo/main/install-oneliner.sh | bash
+
+# Setup and start
+npm run setup        # Installs Redis, Ollama models, etc.
+npm start           # Start standard MCP server
+```
+
+### Generic System (NEW - For ANY Domain)
+```bash
+# After installation
+npm run setup              # If not already done
+npm run start:generic      # Start enhanced generic server
+
+# Or for development
+npm run dev:generic        # With auto-reload
+```
+
+## 🛠️ Under the Hood (Now Even Better)
+
+- **Dynamic Agent Creation**: Create specialized agents at runtime
+- **Enhanced Redis Integration**: Full data sharing between agents (finally!)
+- **Custom Data Schemas**: Each agent can define domain-specific structures
+- **Dialogue System**: Multi-turn conversations for clarification
+- **RAG Integration**: Knowledge management across domains
+- **Event Sourcing**: Every agent action recorded
+- **CQRS Pattern**: Commands and queries separated
+- **Saga Pattern**: Distributed transactions with compensating actions
 
 ## 📊 Real-Time Monitoring
 
@@ -172,6 +231,17 @@ Welcome to distributed systems. The consensus protocol will sort it out.
 
 ### "It generated better code than me"
 *"Don't be jealous, Craig!"*
+
+## 🆕 What's New in v3.0 (The Generic Revolution)
+
+- **Dynamic Agent Creation**: Create agents for ANY domain at runtime
+- **Full Redis Integration**: Agents actually share data now (revolutionary, I know)
+- **Generic Task Processing**: Legal, medical, scientific, business - Debo does it all
+- **Dialogue System**: When Debo needs clarification, it asks (politely)
+- **Custom Data Schemas**: Each agent stores data its own way
+- **RAG Integration**: Knowledge management that actually works
+
+📖 **[Read the Full Generic System Documentation](./GENERIC-SYSTEM-README.md)**
 
 ## 🤝 Contributing
 

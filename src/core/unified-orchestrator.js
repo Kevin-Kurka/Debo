@@ -4,7 +4,7 @@ import { QualityGateway } from './quality-gateway.js';
 import { DependencyResolver } from './dependency-resolver.js';
 import { ErrorRecoveryManager } from './error-recovery.js';
 import { agentConfig } from '../agents/roles.js';
-import { AgentExecutor } from '../agents/executor.js';
+import { EnhancedAgentExecutor } from '../agents/enhanced-executor.js';
 import { ProjectManager } from '../database/project-manager.js';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../logger.js';
@@ -17,7 +17,7 @@ export class UnifiedOrchestrator {
     this.toolManager = new ToolManager(taskManager);
     this.qualityGateway = new QualityGateway(taskManager);
     this.projectManager = new ProjectManager(taskManager);
-    this.agentExecutor = new AgentExecutor(llmProvider, this.toolManager);
+    this.agentExecutor = new EnhancedAgentExecutor(taskManager);
     this.dependencyResolver = new DependencyResolver(taskManager);
     this.errorRecovery = new ErrorRecoveryManager(taskManager);
     this.activeProjects = new Map();
@@ -319,9 +319,18 @@ export class UnifiedOrchestrator {
         });
       }
 
-      // Execute the task using agent executor with error recovery
+      // Execute the task using enhanced agent executor with full Redis integration
       const results = await this.executeWithRecovery(
-        () => this.agentExecutor.executeTask(agentType, action, data),
+        () => this.agentExecutor.executeAgent(agentType, {
+          id: taskId,
+          action,
+          data,
+          metadata: {
+            agentType,
+            action,
+            projectId: data.projectId
+          }
+        }),
         {
           operation: 'agent_task',
           taskId,
@@ -355,7 +364,16 @@ export class UnifiedOrchestrator {
           agentType,
           action,
           projectId: data.projectId,
-          retryOperation: () => this.agentExecutor.executeTask(agentType, action, data)
+          retryOperation: () => this.agentExecutor.executeAgent(agentType, {
+            id: taskId,
+            action,
+            data,
+            metadata: {
+              agentType,
+              action,
+              projectId: data.projectId
+            }
+          })
         });
         
         if (recovered) {
