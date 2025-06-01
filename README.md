@@ -1,4 +1,5 @@
-# Debo - "My grandmama gave me that chain!" 🤖
+# Debo - 
+"My grandmama gave me that chain!" 🤖
 
 <div align="center">
   <img src="https://img.shields.io/badge/version-2.0.0-blue.svg" alt="Version">
@@ -9,9 +10,9 @@
 
 <br>
 
-> *"What bike? THAT'S MY BIKE, PUNK!"* - Debo
+> *"What byte? THAT'S MY BYTE, PUNK!"* - Debo
 > 
-> This system will take your development tasks and make them its own. But instead of stealing bikes, it's commandeering your entire SDLC. 
+> This system will take your development tasks and make them its own, it's commandeering your entire SDLC. 
 
 ## 🚴 What's Debo?
 
