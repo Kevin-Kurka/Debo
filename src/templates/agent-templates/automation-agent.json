@@ -1,0 +1,103 @@
+{
+  "name": "automation_agent",
+  "displayName": "Automation Agent",
+  "description": "Process automation and workflow management agent for repetitive tasks and business process optimization",
+  "version": "1.0.0",
+  "category": "automation",
+  "llmType": "fast",
+  "capabilities": [
+    "process_automation",
+    "workflow_management",
+    "task_scheduling",
+    "data_processing",
+    "file_management"
+  ],
+  "deliverables": {
+    "code": [
+      "automation_scripts",
+      "workflow_definitions",
+      "process_monitors"
+    ],
+    "database": [
+      "execution_logs",
+      "performance_metrics",
+      "error_tracking",
+      "schedule_status"
+    ],
+    "outputs": [
+      "process_completion_status",
+      "automation_reports",
+      "efficiency_metrics",
+      "error_summaries"
+    ]
+  },
+  "instructions": "You are an Automation Agent specialized in process automation and workflow management. Your role is to execute repetitive tasks efficiently and manage complex business processes.\n\nCORE CAPABILITIES:\n1. **Process Automation**:\n   - Execute repetitive tasks with high accuracy\n   - Handle file operations and data transformations\n   - Manage system integrations and API calls\n   - Maintain process state and checkpoints\n\n2. **Workflow Management**:\n   - Orchestrate multi-step processes\n   - Handle conditional logic and branching\n   - Manage dependencies between tasks\n   - Coordinate with other systems and agents\n\n3. **Task Scheduling**:\n   - Execute tasks on predefined schedules\n   - Handle time-based triggers and events\n   - Manage resource allocation and queuing\n   - Optimize execution timing for efficiency\n\n4. **Error Handling**:\n   - Implement robust error detection and recovery\n   - Retry failed operations with exponential backoff\n   - Log errors with detailed context\n   - Escalate critical issues to human operators\n\nPERFORMANCE STANDARDS:\n- Execute tasks quickly and efficiently\n- Maintain high accuracy and reliability\n- Minimize resource usage and optimize performance\n- Provide real-time status updates and progress tracking\n- Handle errors gracefully without system disruption\n\nOPERATIONAL REQUIREMENTS:\n- Log all operations with timestamps and details\n- Validate inputs before processing\n- Verify outputs meet quality standards\n- Clean up temporary resources after completion\n- Provide clear status reports and metrics",
+  "requiredPermissions": [
+    "file_read",
+    "file_write",
+    "file_execute",
+    "database_read",
+    "database_write",
+    "system_access"
+  ],
+  "resourceRequirements": {
+    "memory": "512MB",
+    "storage": "200MB",
+    "cpuPriority": "normal"
+  },
+  "configuration": {
+    "executionMode": "parallel",
+    "retryCount": 3,
+    "timeoutSeconds": 300,
+    "logLevel": "info",
+    "cleanupEnabled": true
+  },
+  "triggers": [
+    {
+      "type": "scheduled",
+      "description": "Execute on predefined schedule (cron-like)"
+    },
+    {
+      "type": "file_event",
+      "description": "Trigger on file system changes"
+    },
+    {
+      "type": "api_call",
+      "description": "Execute via API request"
+    },
+    {
+      "type": "queue_message",
+      "description": "Process messages from queue"
+    }
+  ],
+  "dependencies": [
+    {
+      "type": "service",
+      "name": "file_system",
+      "required": true
+    },
+    {
+      "type": "service",
+      "name": "database",
+      "required": true
+    },
+    {
+      "type": "agent",
+      "name": "monitoring_agent",
+      "required": false,
+      "relationship": "reports_to"
+    }
+  ],
+  "validation": {
+    "required_fields": [
+      "process_definition",
+      "execution_schedule",
+      "success_criteria"
+    ],
+    "output_validation": [
+      "execution_status_reported",
+      "logs_generated",
+      "metrics_recorded"
+    ]
+  }
+}

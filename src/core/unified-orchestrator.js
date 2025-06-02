@@ -6,6 +6,9 @@ import { ErrorRecoveryManager } from './error-recovery.js';
 import { agentConfig } from '../agents/roles.js';
 import { EnhancedAgentExecutor } from '../agents/enhanced-executor.js';
 import { ProjectManager } from '../database/project-manager.js';
+import { TruthFindingOrchestrator } from './truth-finding-orchestrator.js';
+import { AgentIntegrationManager } from './agent-integration-manager.js';
+import { DynamicAgentFactory } from './dynamic-agent-factory.js';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../logger.js';
 
@@ -20,8 +23,12 @@ export class UnifiedOrchestrator {
     this.agentExecutor = new EnhancedAgentExecutor(taskManager);
     this.dependencyResolver = new DependencyResolver(taskManager);
     this.errorRecovery = new ErrorRecoveryManager(taskManager);
+    this.truthFindingOrchestrator = new TruthFindingOrchestrator(taskManager, this);
+    this.agentIntegrationManager = new AgentIntegrationManager(taskManager, llmProvider, this);
+    this.dynamicAgentFactory = new DynamicAgentFactory(taskManager, null);
     this.activeProjects = new Map();
     this.agentWorkload = new Map();
+    this.dynamicAgents = new Map(); // Track dynamic agents
     this.taskExecutionInterval = null;
   }
 
@@ -32,6 +39,12 @@ export class UnifiedOrchestrator {
     await this.agentExecutor.init();
     await this.dependencyResolver.init();
     await this.dependencyResolver.loadDependencyGraph();
+    await this.truthFindingOrchestrator.init();
+    await this.agentIntegrationManager.init();
+    await this.dynamicAgentFactory.init();
+    
+    // Initialize memory management
+    await this.taskManager.initializeMemoryManagement(this.llmProvider);
     
     // Start task execution loop
     this.startTaskExecutionLoop();
@@ -447,6 +460,12 @@ export class UnifiedOrchestrator {
   }
 
   async handleTaskCompletion(taskId, agentType, action, data, results) {
+    // Handle truth-finding agent completions
+    if (['truth_seeker', 'trial_by_fire', 'credibility_agent'].includes(agentType)) {
+      await this.handleTruthFindingTaskCompletion(taskId, agentType, action, data, results);
+      return;
+    }
+
     // Trigger quality checks for code-producing agents
     if (['backend_dev', 'frontend_dev'].includes(agentType)) {
       await this.scheduleQualityCheck(data.projectId, taskId, results);
@@ -714,5 +733,329 @@ export class UnifiedOrchestrator {
     await this.dependencyResolver.cleanupCompletedTasks(24);
     
     logger.info('Orchestrator cleanup completed');
+  }
+
+  // Truth-Finding Methods
+  async investigateClaim(claim, context = {}) {
+    try {
+      const investigationId = await this.truthFindingOrchestrator.investigateClaim(claim, context);
+      
+      // Broadcast investigation start if websocket available
+      if (this.websocketServer) {
+        this.websocketServer.broadcastProjectUpdate(context.projectId || 'truth_investigation', {
+          phase: 'truth_investigation',
+          investigationId,
+          claim: claim.substring(0, 100) + '...',
+          status: 'Investigation started'
+        });
+      }
+      
+      return investigationId;
+    } catch (error) {
+      logger.error('Failed to start investigation:', error);
+      throw error;
+    }
+  }
+
+  async getInvestigationResults(investigationId) {
+    return this.truthFindingOrchestrator.getInvestigationResults(investigationId);
+  }
+
+  async getAllInvestigations(limit = 10) {
+    return this.truthFindingOrchestrator.getAllInvestigations(limit);
+  }
+
+  // Specialized truth-finding methods
+  async investigatePolitician(name, statements) {
+    return this.truthFindingOrchestrator.investigatePolitician(name, statements);
+  }
+
+  async investigateScientificClaim(claim, papers) {
+    return this.truthFindingOrchestrator.investigateScientificClaim(claim, papers);
+  }
+
+  async investigateLegalDispute(claim, evidence, jurisdiction) {
+    return this.truthFindingOrchestrator.investigateLegalDispute(claim, evidence, jurisdiction);
+  }
+
+  // Handle truth-finding agent results
+  async handleTruthFindingTaskCompletion(taskId, agentType, action, data, results) {
+    if (data.investigationId) {
+      await this.truthFindingOrchestrator.processAgentResults(
+        data.investigationId,
+        agentType,
+        results
+      );
+    }
+  }
+
+  // Dynamic Agent Management Methods
+
+  /**
+   * Create a new agent from natural language description
+   */
+  async createAgent(description, options = {}) {
+    try {
+      const agentResult = await this.dynamicAgentFactory.createAgentFromDescription(description, options);
+      
+      // Register the agent with the integration manager
+      const registrationResult = await this.agentIntegrationManager.registerAgent(agentResult.config, options);
+      
+      // Add to dynamic agents tracking
+      this.dynamicAgents.set(registrationResult.agentId, {
+        ...agentResult,
+        registrationData: registrationResult,
+        createdAt: new Date().toISOString()
+      });
+      
+      logger.info(`Dynamic agent created and registered: ${agentResult.config.name} (${registrationResult.agentId})`);
+      
+      return {
+        agentId: registrationResult.agentId,
+        name: agentResult.config.name,
+        config: agentResult.config,
+        status: 'active',
+        capabilities: agentResult.capabilities
+      };
+      
+    } catch (error) {
+      logger.error('Failed to create dynamic agent:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Register a dynamic agent created elsewhere
+   */
+  async registerDynamicAgent(agentId, agentConfig) {
+    try {
+      // Add to known agent configurations
+      agentConfig[agentConfig.name] = {
+        llmType: agentConfig.llmType,
+        deliverables: agentConfig.deliverables,
+        instructions: agentConfig.instructions
+      };
+      
+      // Track in dynamic agents
+      this.dynamicAgents.set(agentId, {
+        id: agentId,
+        config: agentConfig,
+        registeredAt: new Date().toISOString()
+      });
+      
+      logger.info(`Dynamic agent registered: ${agentConfig.name} (${agentId})`);
+      
+    } catch (error) {
+      logger.error('Failed to register dynamic agent:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Unregister a dynamic agent
+   */
+  async unregisterDynamicAgent(agentId) {
+    try {
+      const agent = this.dynamicAgents.get(agentId);
+      if (!agent) {
+        throw new Error(`Dynamic agent not found: ${agentId}`);
+      }
+      
+      // Unregister from integration manager
+      await this.agentIntegrationManager.unregisterAgent(agentId);
+      
+      // Remove from tracking
+      this.dynamicAgents.delete(agentId);
+      
+      // Remove from agent config if it was added
+      if (agentConfig[agent.config.name]) {
+        delete agentConfig[agent.config.name];
+      }
+      
+      logger.info(`Dynamic agent unregistered: ${agent.config.name} (${agentId})`);
+      
+    } catch (error) {
+      logger.error('Failed to unregister dynamic agent:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update a dynamic agent configuration
+   */
+  async updateDynamicAgent(agentId, updates) {
+    try {
+      const updateResult = await this.agentIntegrationManager.updateAgent(agentId, updates);
+      
+      // Update tracking
+      const agent = this.dynamicAgents.get(agentId);
+      if (agent) {
+        agent.config = { ...agent.config, ...updates };
+        agent.lastUpdated = new Date().toISOString();
+      }
+      
+      logger.info(`Dynamic agent updated: ${agentId}`);
+      return updateResult;
+      
+    } catch (error) {
+      logger.error('Failed to update dynamic agent:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Execute a task with a dynamic agent
+   */
+  async executeDynamicAgentTask(agentId, action, data) {
+    try {
+      const agent = this.dynamicAgents.get(agentId);
+      if (!agent) {
+        throw new Error(`Dynamic agent not found: ${agentId}`);
+      }
+      
+      // Create task for the dynamic agent
+      const taskId = await this.createAgentTask(agent.config.name, action, data);
+      
+      // Execute the task
+      await this.executeAgentTask(taskId, agent.config.name, action, data);
+      
+      return taskId;
+      
+    } catch (error) {
+      logger.error('Failed to execute dynamic agent task:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get information about dynamic agents
+   */
+  getDynamicAgents() {
+    return Array.from(this.dynamicAgents.values()).map(agent => ({
+      id: agent.id,
+      name: agent.config.name,
+      type: agent.config.llmType,
+      capabilities: agent.config.capabilities || [],
+      status: 'active',
+      createdAt: agent.createdAt || agent.registeredAt
+    }));
+  }
+
+  /**
+   * Get dynamic agent by ID
+   */
+  getDynamicAgent(agentId) {
+    return this.dynamicAgents.get(agentId);
+  }
+
+  /**
+   * Check if an agent is a dynamic agent
+   */
+  isDynamicAgent(agentId) {
+    return this.dynamicAgents.has(agentId);
+  }
+
+  /**
+   * Handle communication between agents
+   */
+  async facilitateAgentCommunication(sourceAgentId, targetAgentId, message, options = {}) {
+    return this.agentIntegrationManager.facilitateAgentCommunication(
+      sourceAgentId, 
+      targetAgentId, 
+      message, 
+      options
+    );
+  }
+
+  /**
+   * Get agent performance metrics
+   */
+  async getAgentPerformanceMetrics(agentId) {
+    return this.agentIntegrationManager.monitorAgentHealth(agentId);
+  }
+
+  /**
+   * Get system-wide agent statistics
+   */
+  async getAgentStatistics() {
+    const staticAgentCount = Object.keys(agentConfig).length;
+    const dynamicAgentCount = this.dynamicAgents.size;
+    
+    const integrationStats = await this.agentIntegrationManager.getAgentStatistics();
+    
+    return {
+      ...integrationStats,
+      staticAgents: staticAgentCount,
+      dynamicAgents: dynamicAgentCount,
+      totalAgents: staticAgentCount + dynamicAgentCount
+    };
+  }
+
+  /**
+   * Auto-scale agents based on workload
+   */
+  async autoScaleAgents() {
+    return this.agentIntegrationManager.autoScaleAgents();
+  }
+
+  /**
+   * Get memory usage and summarization statistics
+   */
+  async getMemoryStats() {
+    if (this.taskManager.memorySummarizer) {
+      return this.taskManager.memorySummarizer.getMemoryStats();
+    }
+    return { error: 'Memory summarizer not initialized' };
+  }
+
+  /**
+   * Trigger manual memory summarization
+   */
+  async triggerMemorySummarization() {
+    if (this.taskManager.memorySummarizer) {
+      await this.taskManager.triggerSummarization();
+      return { status: 'Summarization triggered' };
+    }
+    return { error: 'Memory summarizer not initialized' };
+  }
+
+  /**
+   * Search through summarized memory
+   */
+  async searchMemory(query, options = {}) {
+    if (this.taskManager.memorySummarizer) {
+      return this.taskManager.memorySummarizer.searchSummaries(query, options);
+    }
+    return { error: 'Memory summarizer not initialized' };
+  }
+
+  /**
+   * Get change history for an entity
+   */
+  async getChangeHistory(entityType, entityId, options = {}) {
+    if (this.taskManager.diffLogger) {
+      return this.taskManager.diffLogger.getChangeHistory(entityType, entityId, options);
+    }
+    return { error: 'Diff logger not initialized' };
+  }
+
+  /**
+   * Compare states between two time points
+   */
+  async compareStates(entityType, entityId, fromTimestamp, toTimestamp) {
+    if (this.taskManager.diffLogger) {
+      return this.taskManager.diffLogger.compareStates(entityType, entityId, fromTimestamp, toTimestamp);
+    }
+    return { error: 'Diff logger not initialized' };
+  }
+
+  /**
+   * Rollback an entity to a previous state
+   */
+  async rollbackEntity(entityType, entityId, targetChangeId, options = {}) {
+    if (this.taskManager.diffLogger) {
+      return this.taskManager.diffLogger.rollback(entityType, entityId, targetChangeId, options);
+    }
+    return { error: 'Diff logger not initialized' };
   }
 }

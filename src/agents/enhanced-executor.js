@@ -43,6 +43,18 @@ export class EnhancedAgentExecutor {
       status: 'running'
     });
 
+    // Report agent starting
+    this.taskManager.reportAgentActivity(agentId, {
+      role: task.requiredRole,
+      task: task.title || task.id,
+      objective: task.description || 'Processing task',
+      progress: 0,
+      status: 'starting',
+      message: `Starting execution of task ${task.id}`,
+      dataAvailable: [],
+      nextSteps: ['Validating prerequisites', 'Loading context']
+    });
+
     try {
       // 1. Validate agent role and capabilities
       const agentRole = task.requiredRole;
@@ -51,12 +63,42 @@ export class EnhancedAgentExecutor {
       }
 
       // 2. Pre-execution validation
+      this.taskManager.reportAgentActivity(agentId, {
+        role: agentRole,
+        task: task.title || task.id,
+        objective: task.description,
+        progress: 10,
+        status: 'validating',
+        message: 'Validating prerequisites and dependencies',
+        dataAvailable: await this.getAvailableData(agentRole, task),
+        nextSteps: ['Execute task logic', 'Generate deliverables']
+      });
       await this.preExecutionValidation(agentId, agentRole, task);
 
       // 3. Execute agent with full database integration
+      this.taskManager.reportAgentActivity(agentId, {
+        role: agentRole,
+        task: task.title || task.id,
+        objective: task.description,
+        progress: 30,
+        status: 'executing',
+        message: 'Executing main task logic',
+        dataAvailable: await this.getAvailableData(agentRole, task),
+        nextSteps: ['Process results', 'Store deliverables']
+      });
       const result = await this.dbIntegration.executeAgentTask(agentId, agentRole, task);
 
       // 4. Post-execution processing
+      this.taskManager.reportAgentActivity(agentId, {
+        role: agentRole,
+        task: task.title || task.id,
+        objective: task.description,
+        progress: 90,
+        status: 'finalizing',
+        message: 'Processing results and updating project state',
+        dataAvailable: Object.keys(result.deliverables || {}),
+        nextSteps: ['Complete task', 'Trigger dependencies']
+      });
       await this.postExecutionProcessing(executionId, agentId, task, result);
 
       // 5. Update execution tracking
@@ -65,6 +107,18 @@ export class EnhancedAgentExecutor {
         status: 'completed',
         success: result.success,
         endTime: Date.now()
+      });
+
+      // Report completion
+      this.taskManager.reportAgentActivity(agentId, {
+        role: agentRole,
+        task: task.title || task.id,
+        objective: task.description,
+        progress: 100,
+        status: 'completed',
+        message: `Task completed successfully with ${result.confidence}% confidence`,
+        dataAvailable: Object.keys(result.deliverables || {}),
+        nextSteps: []
       });
 
       logger.info(`Agent execution completed successfully: ${agentId}`);
@@ -540,6 +594,79 @@ export class EnhancedAgentExecutor {
 
   async getDatabaseUtilizationReport(projectId) {
     return await this.dbIntegration.getDatabaseUtilizationReport(projectId);
+  }
+
+  /**
+   * Get available data for an agent
+   */
+  async getAvailableData(agentRole, task) {
+    const available = [];
+    
+    try {
+      switch (agentRole) {
+        case 'backend_developer':
+          const apiSpecs = await this.redis.hGetAll(`architecture:${task.projectId}`);
+          if (apiSpecs && apiSpecs.apiReference) {
+            available.push('API Specifications');
+          }
+          const requirements = await this.redis.sMembers(`project:${task.projectId}:requirements`);
+          if (requirements.length > 0) {
+            available.push(`${requirements.length} Requirements`);
+          }
+          break;
+          
+        case 'frontend_developer':
+          const uiSpecs = await this.redis.hGetAll(`design:${task.projectId}`);
+          if (uiSpecs) {
+            available.push('UI Specifications');
+          }
+          const apiContracts = await this.redis.hGetAll(`api_contracts:${task.projectId}`);
+          if (apiContracts) {
+            available.push('API Contracts');
+          }
+          break;
+          
+        case 'qa_engineer':
+          const testPlans = await this.redis.sMembers(`test_plans:${task.projectId}`);
+          if (testPlans.length > 0) {
+            available.push(`${testPlans.length} Test Plans`);
+          }
+          const codeFiles = await this.redis.sMembers(`project:${task.projectId}:files`);
+          if (codeFiles.length > 0) {
+            available.push(`${codeFiles.length} Code Files`);
+          }
+          break;
+          
+        case 'devops_engineer':
+          const infraSpecs = await this.redis.hGetAll(`infrastructure:${task.projectId}`);
+          if (infraSpecs) {
+            available.push('Infrastructure Specifications');
+          }
+          const deploymentConfig = await this.redis.hGetAll(`deployment:${task.projectId}`);
+          if (deploymentConfig) {
+            available.push('Deployment Configuration');
+          }
+          break;
+          
+        default:
+          // For other roles, check general project data
+          const projectData = await this.redis.hGetAll(`project:${task.projectId}`);
+          if (projectData) {
+            available.push('Project Information');
+          }
+      }
+      
+      // Check for any previous agent deliverables
+      const deliverables = await this.redis.keys(`deliverables:${task.projectId}:*`);
+      if (deliverables.length > 0) {
+        available.push(`${deliverables.length} Previous Deliverables`);
+      }
+      
+    } catch (error) {
+      logger.warn(`Error getting available data for ${agentRole}: ${error.message}`);
+    }
+    
+    return available;
   }
 }
 

@@ -1,5 +1,6 @@
 import redis from 'redis';
 import { v4 as uuidv4 } from 'uuid';
+import { EventEmitter } from 'events';
 import logger from '../logger.js';
 import { VersionControlManager } from './version-control-manager.js';
 import { DependencyManager } from './dependency-manager.js';
@@ -10,9 +11,13 @@ import { FeedbackReportingManager } from './feedback-reporting-manager.js';
 import { CodeDocumentationManager } from './code-documentation-manager.js';
 import { OrchestrationRulesEngine } from './orchestration-rules-engine.js';
 import { GitWorkflowManager } from './git-workflow-manager.js';
+import { MemorySummarizer } from './memory-summarizer.js';
+import { DiffLogger } from './diff-logger.js';
+import { getTerminalFeedbackSystem } from '../terminal-feedback-system.js';
 
-export class EnhancedTaskManager {
+export class EnhancedTaskManager extends EventEmitter {
   constructor() {
+    super();
     this.redis = redis.createClient({ 
       url: 'redis://localhost:6379',
       retry_strategy: (options) => {
@@ -23,6 +28,7 @@ export class EnhancedTaskManager {
       }
     });
     this.connected = false;
+    this.feedbackSystem = null;
     
     // Initialize sub-managers
     this.versionControl = new VersionControlManager(this);
@@ -34,6 +40,20 @@ export class EnhancedTaskManager {
     this.codeDocumentation = new CodeDocumentationManager(this);
     this.orchestration = new OrchestrationRulesEngine(this);
     this.git = new GitWorkflowManager(this);
+    
+    // Memory management and change tracking
+    this.memorySummarizer = null; // Initialized later with LLM provider
+    this.diffLogger = null; // Initialized later with LLM provider
+    this.summarizationTriggers = {
+      taskCompletionCount: 0,
+      dataSize: 0,
+      lastSummarization: null,
+      thresholds: {
+        taskCount: 100,
+        dataSize: 50 * 1024 * 1024, // 50MB
+        timeInterval: 6 * 60 * 60 * 1000 // 6 hours
+      }
+    };
   }
 
   async connect() {
@@ -42,6 +62,13 @@ export class EnhancedTaskManager {
         await this.redis.connect();
         this.connected = true;
         logger.info('Connected to Redis database');
+        
+        // Initialize feedback system if available
+        try {
+          this.feedbackSystem = getTerminalFeedbackSystem();
+        } catch (err) {
+          logger.debug('Terminal feedback system not available');
+        }
         
         // Set up Redis event handlers
         this.redis.on('error', (err) => {
@@ -81,6 +108,135 @@ export class EnhancedTaskManager {
     }
   }
 
+  /**
+   * Initialize memory management components with LLM provider
+   */
+  async initializeMemoryManagement(llmProvider) {
+    if (!this.memorySummarizer) {
+      this.memorySummarizer = new MemorySummarizer(this, llmProvider);
+      await this.memorySummarizer.init();
+    }
+    
+    if (!this.diffLogger) {
+      this.diffLogger = new DiffLogger(this, llmProvider);
+      await this.diffLogger.init();
+    }
+    
+    // Load existing summarization state
+    await this.loadSummarizationState();
+    
+    logger.info('Memory management components initialized');
+  }
+
+  /**
+   * Load summarization state from database
+   */
+  async loadSummarizationState() {
+    try {
+      const state = await this.getData('summarization_state');
+      if (state) {
+        this.summarizationTriggers = { ...this.summarizationTriggers, ...JSON.parse(state) };
+      }
+    } catch (error) {
+      logger.warn('Failed to load summarization state:', error);
+    }
+  }
+
+  /**
+   * Save summarization state to database
+   */
+  async saveSummarizationState() {
+    try {
+      await this.setData('summarization_state', JSON.stringify(this.summarizationTriggers));
+    } catch (error) {
+      logger.error('Failed to save summarization state:', error);
+    }
+  }
+
+  /**
+   * Check if summarization should be triggered
+   */
+  async checkSummarizationTriggers() {
+    const triggers = this.summarizationTriggers;
+    const thresholds = triggers.thresholds;
+    
+    let shouldSummarize = false;
+    const reasons = [];
+    
+    // Check task completion count
+    if (triggers.taskCompletionCount >= thresholds.taskCount) {
+      shouldSummarize = true;
+      reasons.push(`Task count threshold reached: ${triggers.taskCompletionCount}/${thresholds.taskCount}`);
+    }
+    
+    // Check data size
+    if (triggers.dataSize >= thresholds.dataSize) {
+      shouldSummarize = true;
+      reasons.push(`Data size threshold reached: ${Math.round(triggers.dataSize / 1024 / 1024)}MB`);
+    }
+    
+    // Check time interval
+    if (triggers.lastSummarization) {
+      const timeSinceLastSummarization = Date.now() - new Date(triggers.lastSummarization).getTime();
+      if (timeSinceLastSummarization >= thresholds.timeInterval) {
+        shouldSummarize = true;
+        reasons.push(`Time threshold reached: ${Math.round(timeSinceLastSummarization / 1000 / 60 / 60)} hours`);
+      }
+    } else {
+      // First time - trigger after some initial data
+      if (triggers.taskCompletionCount >= 10) {
+        shouldSummarize = true;
+        reasons.push('Initial summarization trigger');
+      }
+    }
+    
+    if (shouldSummarize) {
+      logger.info('Summarization triggered:', reasons);
+      await this.triggerSummarization();
+    }
+  }
+
+  /**
+   * Trigger memory summarization
+   */
+  async triggerSummarization() {
+    if (!this.memorySummarizer) {
+      logger.warn('Memory summarizer not initialized');
+      return;
+    }
+    
+    try {
+      await this.memorySummarizer.performAutomaticCompression();
+      
+      // Reset counters
+      this.summarizationTriggers.taskCompletionCount = 0;
+      this.summarizationTriggers.dataSize = 0;
+      this.summarizationTriggers.lastSummarization = new Date().toISOString();
+      
+      await this.saveSummarizationState();
+      
+      logger.info('Memory summarization completed successfully');
+    } catch (error) {
+      logger.error('Memory summarization failed:', error);
+    }
+  }
+
+  /**
+   * Log a change with diff tracking
+   */
+  async logChange(entityType, entityId, changes, context = {}) {
+    if (!this.diffLogger) {
+      return null;
+    }
+    
+    try {
+      return await this.diffLogger.logChange(entityType, entityId, changes, context);
+    } catch (error) {
+      logger.error('Failed to log change:', error);
+      return null;
+    }
+  }
+
   async createTask(taskData) {
     await this.ensureConnection();
     const taskId = uuidv4();
@@ -92,10 +248,28 @@ export class EnhancedTaskManager {
       createdAt: new Date().toISOString()
     };
 
+    // Report database operation
+    this.reportDatabaseOperation({
+      type: 'create',
+      table: 'task',
+      key: taskId,
+      operation: 'hSet',
+      data: task,
+      agent: taskData.agentType || 'system'
+    });
+
     await this.redis.hSet(`task:${taskId}`, task);
     await this.redis.sAdd('active_tasks', taskId);
     
     if (taskData.projectId) {
+      this.reportDatabaseOperation({
+        type: 'update',
+        table: 'project_tasks',
+        key: taskData.projectId,
+        operation: 'sAdd',
+        data: taskId,
+        agent: taskData.agentType || 'system'
+      });
       await this.redis.sAdd(`project_tasks:${taskData.projectId}`, taskId);
     }
 
@@ -132,10 +306,30 @@ export class EnhancedTaskManager {
     await this.redis.hSet(`task:${taskId}`, updateData);
     
     const task = await this.redis.hGetAll(`task:${taskId}`);
+    
+    // Log change with diff tracking
+    await this.logChange('task', taskId, updateData, {
+      operation: 'status_update',
+      previousStatus: task.status,
+      agent: task.agentType || 'system'
+    });
+    
     await this.logActivity('task_status_updated', task.agentType || 'system', taskId, task.projectId || 'default', {
       oldStatus: task.status,
       newStatus: status
     });
+
+    // Update summarization triggers
+    if (status === 'completed' || status === 'failed') {
+      this.summarizationTriggers.taskCompletionCount++;
+      
+      // Estimate data size increase (rough calculation)
+      const dataSize = JSON.stringify(task).length + JSON.stringify(updateData).length;
+      this.summarizationTriggers.dataSize += dataSize;
+      
+      // Check if summarization should be triggered
+      await this.checkSummarizationTriggers();
+    }
 
     return updateData;
   }
@@ -432,5 +626,41 @@ export class EnhancedTaskManager {
       message: `${activity.type}: ${activity.actor} - ${JSON.stringify(activity.details)}`,
       projectId: activity.projectId
     }));
+  }
+
+  /**
+   * Report database operation to feedback system
+   */
+  reportDatabaseOperation(operation) {
+    if (this.feedbackSystem) {
+      this.feedbackSystem.reportDatabaseOperation(operation);
+    }
+    
+    // Also emit event
+    this.emit('database:operation', operation);
+  }
+
+  /**
+   * Report task status to feedback system
+   */
+  reportTaskStatus(taskId, status) {
+    if (this.feedbackSystem) {
+      this.feedbackSystem.reportTaskStatus(taskId, status);
+    }
+    
+    // Also emit event
+    this.emit('task:status', { taskId, ...status });
+  }
+
+  /**
+   * Report agent activity
+   */
+  reportAgentActivity(agentId, activity) {
+    if (this.feedbackSystem) {
+      this.feedbackSystem.reportAgentActivity(agentId, activity);
+    }
+    
+    // Also emit event
+    this.emit('agent:activity', { agentId, activity });
   }
 }

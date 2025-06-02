@@ -37,7 +37,7 @@ show_banner() {
     ██████╔╝███████╗██████╔╝╚██████╔╝
     ╚═════╝ ╚══════╝╚═════╝  ╚═════╝ 
 
-    Autonomous Development System v2.0
+    Autonomous Development System v3.1.0
 EOF
     echo -e "${NC}"
     echo -e "${BOLD}🤖 Installing your AI development team...${NC}\n"
@@ -451,82 +451,57 @@ EOF
     success "Project directories created"
 }
 
-# Download AI models
+# Download AI models with real-time progress
 download_models() {
-    info "Downloading AI models (this will run in background)..."
+    info "Downloading AI models..."
+    echo -e "${YELLOW}This may take 10-30 minutes depending on your connection${NC}\n"
     
-    # Create model download script
-    cat > "$INSTALL_DIR/download_models.sh" << 'EOF'
-#!/bin/bash
-
-# Model download script with progress tracking
-MODELS=(
-    "qwen2.5:14b:Thinking model"
-    "qwen2.5:7b:Fast execution model"
-    "qwen2.5-vl:7b:Vision model"
-    "deepseek-r1:1.5b:Reasoning model"
-)
-
-echo "🤖 Downloading AI models for Debo..."
-echo "This may take 10-30 minutes depending on your connection"
-echo ""
-
-download_model() {
-    local model=$1
-    local desc=$2
+    local models=(
+        "qwen2.5:14b:Thinking model (14B parameters):8.4GB"
+        "qwen2.5:7b:Fast execution model (7B parameters):4.2GB"
+        "qwen2.5-vl:7b:Vision model (7B parameters):4.2GB"
+        "deepseek-r1:1.5b:Reasoning model (1.5B parameters):0.9GB"
+    )
     
-    echo "📥 Downloading $desc ($model)..."
-    if ollama pull "$model" 2>&1; then
-        echo "✅ $desc ready"
-        return 0
-    else
-        echo "❌ Failed to download $desc"
-        return 1
-    fi
-}
-
-# Download models sequentially
-failed_models=()
-for model_info in "${MODELS[@]}"; do
-    IFS=':' read -r model size desc <<< "$model_info"
-    if ! download_model "$model" "$desc"; then
-        failed_models+=("$model")
-    fi
-    echo ""
-done
-
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-if [ ${#failed_models[@]} -eq 0 ]; then
-    echo "🎉 All models downloaded successfully!"
-else
-    echo "⚠️  Some models failed to download:"
-    for model in "${failed_models[@]}"; do
-        echo "  - $model"
+    local total_models=${#models[@]}
+    local current_model=0
+    local failed_models=()
+    
+    for model_info in "${models[@]}"; do
+        IFS=':' read -r model_name model_size desc size <<< "$model_info"
+        ((current_model++))
+        
+        echo -e "\n${BOLD}[$current_model/$total_models] Downloading: $desc${NC}"
+        echo -e "${CYAN}Model: $model_name | Size: $size${NC}"
+        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        
+        # Check if model already exists
+        if ollama list 2>/dev/null | grep -q "^$model_name"; then
+            success "$desc already downloaded"
+            continue
+        fi
+        
+        # Download with progress shown
+        if ollama pull "$model_name"; then
+            success "$desc downloaded successfully"
+        else
+            warning "Failed to download $desc"
+            failed_models+=("$model_name")
+            echo -e "${YELLOW}You can retry later with: ollama pull $model_name${NC}"
+        fi
     done
-    echo ""
-    echo "You can retry with: ollama pull <model-name>"
-fi
-
-# Send notification on macOS
-if command -v osascript &> /dev/null; then
-    osascript -e 'display notification "AI models are ready!" with title "Debo Setup Complete"' 2>/dev/null || true
-fi
-
-# Send notification on Linux
-if command -v notify-send &> /dev/null; then
-    notify-send "Debo Setup Complete" "AI models are ready!" 2>/dev/null || true
-fi
-EOF
     
-    chmod +x "$INSTALL_DIR/download_models.sh"
+    echo -e "\n${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     
-    # Start model download in background
-    nohup "$INSTALL_DIR/download_models.sh" > "$INSTALL_DIR/model_download.log" 2>&1 &
-    local download_pid=$!
-    
-    success "Model download started (PID: $download_pid)"
-    info "Monitor progress: tail -f $INSTALL_DIR/model_download.log"
+    if [ ${#failed_models[@]} -eq 0 ]; then
+        success "All models downloaded successfully!"
+    else
+        warning "Some models failed to download:"
+        for model in "${failed_models[@]}"; do
+            echo "  - $model"
+        done
+        echo -e "\n${YELLOW}You can retry these later with: ollama pull <model-name>${NC}"
+    fi
 }
 
 # Setup shell integration
@@ -737,9 +712,12 @@ main() {
     run_initial_setup
     
     # Final steps
+    echo
     update_progress 95 "Downloading AI models..."
+    echo
     download_models
     
+    echo
     update_progress 98 "Testing installation..."
     test_installation
     
@@ -760,7 +738,7 @@ main() {
     echo "   • Location: $INSTALL_DIR"
     echo "   • Config: $INSTALL_DIR/.env"
     echo "   • Logs: $INSTALL_DIR/logs/"
-    echo "   • Models: Downloading in background"
+    echo "   • Models: Downloaded and ready"
     echo
     echo -e "${BOLD}🚀 Quick Start:${NC}"
     echo "   1. Restart your terminal or run: source ${shell_rc:-~/.bashrc}"

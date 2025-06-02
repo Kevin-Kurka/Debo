@@ -23,6 +23,7 @@
 
 import { EnhancedTaskManager } from './database/task-manager.js';
 import { LLMProvider } from './infrastructure/llm-provider.js';
+import { UnifiedOrchestrator } from './core/unified-orchestrator.js';
 import logger from './logger.js';
 import { execSync } from 'child_process';
 import os from 'os';
@@ -34,6 +35,7 @@ class DeboMCPServer {
   constructor() {
     this.taskManager = new EnhancedTaskManager();
     this.llmProvider = new LLMProvider();
+    this.orchestrator = null;
     this.activeWorkflows = new Map();
     this.userContext = new Map();
     this.init();
@@ -50,12 +52,17 @@ class DeboMCPServer {
       await this.taskManager.connect();
       await this.llmProvider.init();
       
+      // Initialize orchestrator
+      this.orchestrator = new UnifiedOrchestrator(this.taskManager, this.llmProvider);
+      await this.orchestrator.init();
+      
       // Start background processes
       this.startAgentSystem();
       this.startMonitoring();
       
       logger.info("🚀 Debo Autonomous Development System Ready");
       logger.info("✅ All subsystems initialized successfully");
+      logger.info("✅ Truth-Finding System Online");
       
     } catch (error) {
       logger.error("Failed to initialize Debo:", error);
@@ -141,35 +148,88 @@ class DeboMCPServer {
             },
             required: ["request"]
           }
+        }, {
+          name: "truth_investigate",
+          description: "Advanced truth-finding system using legal evidence standards. Verifies claims, evaluates arguments, and assesses source credibility. Uses three specialized agents: truth_seeker (primary source verification), trial_by_fire (adversarial analysis), and credibility_agent (source reliability). Perfect for fact-checking, political claims, scientific debates, and legal disputes.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              claim: {
+                type: "string",
+                description: "The claim or statement to investigate"
+              },
+              type: {
+                type: "string",
+                enum: ["general", "political", "scientific", "legal"],
+                description: "Type of investigation (default: general)",
+                optional: true
+              },
+              sources: {
+                type: "array",
+                items: { type: "string" },
+                description: "Optional list of sources to evaluate",
+                optional: true
+              },
+              context: {
+                type: "object",
+                description: "Additional context for the investigation",
+                optional: true
+              }
+            },
+            required: ["claim"]
+          }
         }]
       }
     };
   }
 
   async handleToolCall(request) {
-    if (request.params?.name !== 'debo') {
-      return this.createErrorResponse(request.id, -32602, "Invalid params");
-    }
-
-    const { request: userRequest, feedback = 'normal' } = request.params.arguments;
+    const toolName = request.params?.name;
     
-    try {
-      // Process the request autonomously
-      const result = await this.processRequest(userRequest, feedback);
+    if (toolName === 'debo') {
+      const { request: userRequest, feedback = 'normal' } = request.params.arguments;
       
-      return {
-        jsonrpc: "2.0",
-        id: request.id,
-        result: {
-          content: [{
-            type: "text",
-            text: result
-          }]
-        }
-      };
-    } catch (error) {
-      logger.error('Debo processing failed:', error);
-      return this.createErrorResponse(request.id, -32603, "Processing failed", error.message);
+      try {
+        // Process the request autonomously
+        const result = await this.processRequest(userRequest, feedback);
+        
+        return {
+          jsonrpc: "2.0",
+          id: request.id,
+          result: {
+            content: [{
+              type: "text",
+              text: result
+            }]
+          }
+        };
+      } catch (error) {
+        logger.error('Debo processing failed:', error);
+        return this.createErrorResponse(request.id, -32603, "Processing failed", error.message);
+      }
+    } else if (toolName === 'truth_investigate') {
+      const { claim, type = 'general', sources = [], context = {} } = request.params.arguments;
+      
+      try {
+        // Process truth investigation
+        const result = await this.processTruthInvestigation(claim, type, sources, context);
+        
+        return {
+          jsonrpc: "2.0",
+          id: request.id,
+          result: {
+            content: [{
+              type: "text",
+              text: result
+            }]
+          }
+        };
+      } catch (error) {
+        logger.error('Truth investigation failed:', error);
+        return this.createErrorResponse(request.id, -32603, "Investigation failed", error.message);
+      }
+    } else {
+      return this.createErrorResponse(request.id, -32602, "Invalid tool name");
     }
   }
 
@@ -984,6 +1044,187 @@ Or proceed with defaults: \`debo "Build ${projectName} with standard settings"\`
     }
     
     return neededRole;
+  }
+
+  createErrorResponse(id, code, message, data = null) {
+    const response = {
+      jsonrpc: "2.0",
+      id,
+      error: {
+        code,
+        message
+      }
+    };
+    
+    if (data) {
+      response.error.data = data;
+    }
+    
+    return response;
+  }
+
+  async processTruthInvestigation(claim, type, sources, context) {
+    const startTime = Date.now();
+    
+    try {
+      // Prepare context based on investigation type
+      const investigationContext = {
+        ...context,
+        type,
+        sources,
+        projectId: `truth_${type}_${Date.now()}`
+      };
+      
+      // Handle specific investigation types
+      let investigationId;
+      
+      switch (type) {
+        case 'political':
+          if (sources.length > 0) {
+            // Assume first source is politician name, rest are statements
+            investigationId = await this.orchestrator.investigatePolitician(
+              sources[0],
+              sources.slice(1)
+            );
+          } else {
+            investigationId = await this.orchestrator.investigateClaim(claim, investigationContext);
+          }
+          break;
+          
+        case 'scientific':
+          investigationId = await this.orchestrator.investigateScientificClaim(
+            claim,
+            sources // Assume sources are scientific papers
+          );
+          break;
+          
+        case 'legal':
+          investigationId = await this.orchestrator.investigateLegalDispute(
+            claim,
+            sources, // Evidence list
+            context.jurisdiction || 'US Federal'
+          );
+          break;
+          
+        default:
+          investigationId = await this.orchestrator.investigateClaim(claim, investigationContext);
+      }
+      
+      // Wait for investigation to complete with periodic status checks
+      let status = 'in_progress';
+      let checkCount = 0;
+      const maxChecks = 60; // Max 5 minutes (5 second intervals)
+      
+      while (status === 'in_progress' && checkCount < maxChecks) {
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+        
+        const results = await this.orchestrator.getInvestigationResults(investigationId);
+        status = results.status;
+        checkCount++;
+        
+        // Log progress
+        if (checkCount % 6 === 0) { // Every 30 seconds
+          logger.info(`Investigation ${investigationId} still in progress... (${checkCount * 5}s elapsed)`);
+        }
+      }
+      
+      // Get final results
+      const finalResults = await this.orchestrator.getInvestigationResults(investigationId);
+      
+      if (finalResults.status === 'failed') {
+        return this.formatInvestigationError(claim, finalResults);
+      }
+      
+      // Format the results for display
+      return this.formatInvestigationResults(claim, finalResults, startTime);
+      
+    } catch (error) {
+      logger.error('Truth investigation error:', error);
+      return `❌ Investigation Failed
+
+**Claim:** ${claim}
+**Error:** ${error.message}
+
+The truth-finding system encountered an error. Please try again or refine your claim.`;
+    }
+  }
+
+  formatInvestigationResults(claim, results, startTime) {
+    const duration = Math.round((Date.now() - startTime) / 1000);
+    const verdict = results.results?.finalVerdict || results.verdict;
+    
+    if (!verdict) {
+      return `⏳ Investigation Incomplete
+
+**Claim:** ${claim}
+**Status:** ${results.status}
+
+The investigation is still in progress. Please check back later for results.`;
+    }
+    
+    const { conclusion, confidence, weightedScore, scores, reasoning } = verdict;
+    const evidenceReport = results.results?.evidenceReport || {};
+    
+    return `# 🔍 Truth Investigation Report
+
+## Claim Investigated
+> ${claim}
+
+## 📊 Verdict: ${conclusion}
+**Confidence Level:** ${confidence.toUpperCase()}
+**Overall Score:** ${weightedScore}/100
+
+## 🏛️ Evidence Analysis
+- **Primary Sources Verified:** ${evidenceReport.admissible || 0}
+- **Evidence Rejected:** ${evidenceReport.inadmissible || 0}
+- **Hearsay Identified:** ${evidenceReport.hearsay || 0}
+- **Authenticated Sources:** ${evidenceReport.authenticated || 0}
+
+## 📈 Component Scores
+- **Truth Score (Primary Sources):** ${scores.truth}/100
+- **Argument Score (Adversarial Analysis):** ${scores.argument}/100
+- **Credibility Score (Source Reliability):** ${scores.credibility}/100
+
+## 💡 Key Findings
+${reasoning.map(r => `- ${r}`).join('\n')}
+
+## 🚨 Issues Identified
+${evidenceReport.issues && evidenceReport.issues.length > 0 ? 
+  evidenceReport.issues.map(issue => 
+    `- **${issue.evidence}:** ${issue.problems.join(', ')}`
+  ).join('\n') : 
+  '- No significant issues found'}
+
+## 📝 Recommendations
+${evidenceReport.recommendations && evidenceReport.recommendations.length > 0 ?
+  evidenceReport.recommendations.map(rec => `- ${rec}`).join('\n') :
+  '- Evidence meets acceptable standards'}
+
+## ⏱️ Investigation Details
+- **Investigation ID:** ${results.id}
+- **Duration:** ${duration} seconds
+- **Agents Deployed:** Truth Seeker, Trial by Fire, Credibility Agent
+
+---
+*This investigation used legal evidence standards including hearsay rules, authentication requirements, and burden of proof thresholds.*`;
+  }
+
+  formatInvestigationError(claim, results) {
+    return `❌ Investigation Failed
+
+**Claim:** ${claim}
+**Status:** ${results.status}
+**Error:** ${results.error || 'Unknown error occurred'}
+
+The investigation could not be completed. This may be due to:
+- Insufficient available evidence
+- Sources that cannot be verified
+- Technical issues with the analysis
+
+Please try:
+1. Providing more specific sources
+2. Breaking down complex claims into simpler statements
+3. Including context or background information`;
   }
 }
 
