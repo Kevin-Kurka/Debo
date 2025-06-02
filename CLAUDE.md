@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Debo is an Enterprise AI System with 54 specialized business agents that handle ANY task through natural language. The system provides a complete Fortune 500 company structure optimized for performance and cost efficiency.
+Debo is an **open source AI enterprise system** with 54 specialized business agents that run entirely locally on the user's machine. All agents operate via Ollama with optional external access when explicitly configured. The system provides complete privacy with no vendor lock-in.
 
 ## Common Development Commands
 
@@ -12,114 +12,138 @@ Debo is an Enterprise AI System with 54 specialized business agents that handle 
 ```bash
 npm install              # Install dependencies  
 npm run setup           # Initial setup (Redis, Ollama models, system config)
-npm start               # Start optimized enterprise system
+npm start               # Start MCP server (production)
 npm run dev             # Start with nodemon for development
 ```
 
 ### Testing and Quality
 ```bash
-npm test                # Run tests
+npm test                # Run Jest tests
+npm run test:watch      # Run tests in watch mode
+npm run test:coverage   # Run tests with coverage report
 npm run health          # Check system health
-npm run clean           # Clean up old data
+npm run clean           # Clean up old Redis data
 ```
 
-### Using Debo
+### Installation and Dependencies
 ```bash
-# Single command for everything
-debo "your request in natural language"
-
-# Examples
-debo "create a REST API with authentication"
-debo "prepare Q3 financial statements"
-debo "design employee onboarding workflow" 
-debo "analyze our competitive market position"
+npm run install-deps    # Run system installer (./install.sh)
+./install-oneliner.sh   # One-line system installation
 ```
 
 ## High-Level Architecture
 
-### Enterprise Structure (54 Agents)
+### Privacy-First Design
+- **Local Processing**: All 54 agents run on user's machine via Ollama
+- **Local Storage**: Redis database stores all data locally
+- **Optional External**: Agents only reach out when explicitly configured
+- **Open Source**: MIT licensed, completely transparent
+
+### Unified Services Architecture
+The system uses a consolidated service architecture (ServiceFactory pattern):
+
+1. **DatabaseService**: Unified Redis operations with connection pooling
+2. **AgentExecutionEngine**: Optimized agent processing with batch operations  
+3. **LLMRequestManager**: Request batching, caching, and cost optimization
+4. **MemoryManager**: Intelligent cleanup and auto-summarization
+5. **UnifiedOrchestratorService**: Strategic orchestration with multiple patterns
+
+### Agent Hierarchy (54 Agents)
 ```
 CEO Agent (Strategic Analysis)
-├── C-Suite (8 Executive Agents)
-│   ├── CFO - Financial Strategy
-│   ├── COO - Operations  
-│   ├── CTO - Technology
-│   ├── CMO - Marketing
-│   ├── CHRO - Human Resources
-│   ├── CLO - Legal
-│   └── CRO - Revenue
-│
-└── Departments (46 Specialist Agents)
-    ├── Finance (8 agents)
-    ├── Engineering (11 agents) 
-    ├── Legal (6 agents)
-    ├── Sales (6 agents)
-    ├── Marketing (6 agents)
-    ├── Operations (6 agents)
-    └── HR (6 agents)
+├── C-Suite (8 Executive Agents) - Strategic thinking models
+│   ├── CFO, COO, CTO, CMO, CHRO, CLO, CRO
+└── Departments (46 Specialist Agents) - Fast execution models
+    ├── Finance (8), Engineering (11), Legal (6)
+    ├── Sales (6), Marketing (6), Operations (6), HR (6)
 ```
 
-### Core Components
-
-1. **MCP Server** (`src/mcp_server.js`): Main entry point with optimized performance
-2. **Unified Services** (`src/services/`): Consolidated database, LLM, and orchestration services
-3. **Agent System** (`src/agents/`): All 54 business agents with specialized roles
-4. **Quality Gateway** (`src/core/quality-gateway.js`): Automated quality checks
-5. **Redis State Management**: All agent data shared through optimized Redis operations
-
-### Request Flow
-1. User sends natural language request via `debo` tool
-2. CEO agent analyzes and determines scope
-3. Work delegated to appropriate departments
-4. Specialized agents execute tasks in parallel
-5. Results aggregated and returned with quality checks
-
-### Database Schema
-Redis with optimized structure:
-- `project:{id}`: Project metadata
-- `task:{id}`: Task details and results
-- `agent:{id}:state`: Agent execution state
-- `workflow:{id}`: Business workflow data
+### MCP Server Flow
+1. **Single Tool Interface**: Only `debo` tool accepts natural language
+2. **CEO Analysis**: Strategic analysis and task delegation
+3. **Parallel Execution**: Departments work simultaneously with Redis state sharing
+4. **Quality Gateway**: Automated checks for all deliverables
+5. **Result Aggregation**: Unified response with full audit trail
 
 ## Key Design Patterns
-- **Single Tool Interface**: Everything through one `debo` command
-- **Optimized Services**: Consolidated architecture for 3x performance
-- **Event-driven execution**: Asynchronous task coordination
-- **Quality-first**: Automated checks for all deliverables
-- **Enterprise-grade**: Redis state management and error recovery
+
+### Service Factory Pattern
+```javascript
+// All services initialized through ServiceFactory
+const services = await ServiceFactory.createOptimizedServices();
+// Returns: database, llmRequest, memory, agentExecution, orchestrator
+```
+
+### Agent Role Architecture
+- **fortune500-roles.js**: All 54 business agent definitions
+- **enhanced-executor.js**: Unified agent execution with Redis integration
+- **department-manager.js**: Cross-department coordination
+
+### Redis Schema
+```
+project:{id}              # Project metadata and status
+task:{id}                 # Task details and results  
+agent:{id}:state         # Agent execution contexts
+workflow:{id}            # Business workflow data
+```
 
 ## Development Guidelines
 
-### When Adding Features
-1. Use the optimized services architecture
-2. Ensure all agents use proper Redis integration
-3. Follow the single tool design pattern
-4. Add appropriate quality checks
+### Working with Services
+- Use ServiceFactory for service initialization
+- All services support graceful shutdown and health checks
+- Services auto-initialize dependencies in correct order
+- Shared utilities available in `src/utils/shared-utilities.js`
+
+### Adding New Agents
+1. Define role in `src/agents/fortune500-roles.js` or create new role file
+2. Use EnhancedExecutor for Redis integration
+3. Follow department structure (thinking vs execution agents)
+4. Ensure deliverables follow quality gateway patterns
+
+### Local-First Development
+- Default configuration uses local Ollama models
+- External APIs require explicit environment variable configuration
+- All processing happens locally unless user specifically requests external access
+- Test with `npm run health` to verify local-only operation
 
 ### Performance Optimization
-- All services are enterprise-optimized
-- Use batch operations for database access
-- Implement proper error handling and recovery
-- Monitor agent performance through built-in metrics
-
-### Working with Agents
-- All agents use the unified agent execution engine
-- State is automatically persisted to Redis
-- Follow existing agent role patterns
-- Ensure deliverables are properly structured
+- Services are pre-optimized with batching and caching
+- Use `logger.js` with createLogger for named loggers
+- Monitor performance through built-in metrics in services
+- Agent state automatically persists to Redis
 
 ## Environment Variables
 
-Required in `.env`:
+Required for local operation:
 ```bash
 REDIS_URL=redis://localhost:6379
 OLLAMA_BASE_URL=http://localhost:11434
 ```
 
-## Important Notes
+Optional for external access:
+```bash
+# Only set these if you want external capabilities
+OPENAI_API_KEY=your_key_here
+ANTHROPIC_API_KEY=your_key_here
+```
 
-1. **Single Installation**: Only one optimized version - no legacy systems
-2. **Performance**: Enterprise-grade optimization for speed and cost efficiency
-3. **Simplicity**: One command (`debo`) handles everything
-4. **Enterprise-grade**: Designed for business use across all domains
-5. **Natural Language**: No complex syntax or configuration required
+## Important Implementation Notes
+
+1. **Open Source Focus**: MIT licensed, no proprietary dependencies
+2. **Privacy First**: No external calls without explicit user configuration
+3. **Single Tool Design**: Only `debo` command - no separate dialogue/query tools
+4. **Unified Architecture**: One optimized service layer, no legacy code
+5. **Local LLMs**: Primary operation through Ollama models
+6. **Agent Collaboration**: Full Redis state sharing between all 54 agents
+7. **Quality Gateway**: Automated validation for all agent outputs
+
+## Agent Communication Flow
+
+Agents communicate through Redis with these key patterns:
+- **Task Delegation**: CEO → C-Suite → Departments
+- **State Sharing**: All agents read/write shared project state
+- **Deliverable Storage**: Structured outputs stored with metadata
+- **Workflow Coordination**: Department managers orchestrate team efforts
+
+The system is designed for complete local operation with the flexibility to reach out for external information only when the user explicitly requests it.
