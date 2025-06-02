@@ -1,22 +1,46 @@
-# Debo - Enterprise AI System 🚀
-*"My grandmama gave me that chain!" - Debo takes over ALL your tasks*
+# Debo - Open Source AI Enterprise System 🚀
+*"My grandmama gave me that chain!" - Local AI agents that work for YOU*
 
 <div align="center">
   <img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License">
-  <img src="https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg" alt="Node">
+  <img src="https://img.shields.io/badge/open--source-100%25-brightgreen.svg" alt="Open Source">
+  <img src="https://img.shields.io/badge/runs--locally-✓-blue.svg" alt="Local">
 </div>
 
 ## What is Debo?
 
-Debo is your enterprise AI workforce - **54 specialized business agents** that handle ANY task through natural language. No more manual work. Just tell Debo what you need done.
+**Open source AI enterprise system** with **54 specialized agents** that run entirely on YOUR machine. No data leaves your environment unless YOU want it to. Complete privacy, total control.
 
-• **Software Development** - "Build me a microservice with Redis caching"
-• **Financial Analysis** - "Create Q3 budget variance report" 
-• **Legal Work** - "Review this contract for compliance issues"
-• **HR Management** - "Design employee onboarding workflow"
-• **Sales Operations** - "Analyze our pipeline conversion rates"
-• **Marketing** - "Create a product launch campaign"
+• **100% Open Source** - MIT licensed, inspect every line of code
+• **Runs Locally** - All 54 agents operate on your hardware via Ollama
+• **Reach Out When Needed** - Agents can access web/APIs only when you permit
+• **Your Data Stays Yours** - Everything stored in your local Redis instance
+• **No Vendor Lock-in** - Use any LLM provider or stay completely local
+
+## 🔒 Privacy-First Design
+
+```bash
+# Everything runs locally by default
+┌─────────────────────────────────────┐
+│ YOUR MACHINE (Complete Privacy)     │
+├─────────────────────────────────────┤
+│ ✓ 54 AI Agents (Local Ollama)      │
+│ ✓ Redis Database (Your Data)       │
+│ ✓ All Processing (Local CPU/GPU)   │
+│ ✓ No External Dependencies         │
+└─────────────────────────────────────┘
+           │
+           │ (Only when YOU choose)
+           ▼
+┌─────────────────────────────────────┐
+│ EXTERNAL (Optional)                 │
+├─────────────────────────────────────┤
+│ ? Web Research (if requested)       │
+│ ? API Calls (if configured)        │
+│ ? Cloud LLMs (if you want)         │
+└─────────────────────────────────────┘
+```
 
 ## ⚡ Installation (One Command)
 
@@ -24,55 +48,47 @@ Debo is your enterprise AI workforce - **54 specialized business agents** that h
 curl -fsSL https://raw.githubusercontent.com/Kevin-Kurka/Debo/main/install-oneliner.sh | bash
 ```
 
-That's it. Debo will:
-• Install all dependencies (Redis, Ollama, models)
-• Configure the enterprise system
-• Start all 54 business agents
-• Give you a single `debo` command for everything
+This installs everything locally:
+• **Ollama** with enterprise AI models
+• **Redis** for your private data storage
+• **54 Business Agents** ready to work
+• **Zero external dependencies** required
 
-## 🏢 Enterprise Features
+## 🏢 Your Local AI Workforce
 
-• **54 Business Agents** - Complete Fortune 500 structure (CEO, CFO, COO, departments)
-• **Natural Language Interface** - Just talk to it normally
-• **Cross-Department Collaboration** - Agents work together on complex tasks
-• **Real-Time Monitoring** - See all agent activity live
-• **Enterprise Performance** - Optimized for speed and cost efficiency
-• **Any Domain** - Legal, financial, technical, operational - Debo handles it all
+• **54 Business Agents** - Complete Fortune 500 structure on YOUR machine
+• **Natural Language Interface** - Just talk to them normally  
+• **Cross-Department Collaboration** - Agents work together locally
+• **Optional External Access** - Reach out to web/APIs only when needed
+• **Complete Transparency** - Inspect and modify every agent's code
+• **Any Domain** - Technical, financial, legal, operational tasks
 
 ## 🚀 How to Use
 
-After installation, use the single `debo` command for everything:
+After installation, everything runs locally through the `debo` command:
 
 ```bash
-# Technical Tasks
-debo "create a REST API with authentication and rate limiting"
-
-# Business Tasks  
-debo "prepare our quarterly board presentation"
-
-# Financial Tasks
-debo "analyze our burn rate and runway projections"
-
-# Legal Tasks
-debo "review this vendor contract for liability issues"
-
-# Operations Tasks
-debo "optimize our customer support workflow"
+# All processing happens on YOUR machine
+debo "create a REST API with authentication"
+debo "analyze our Q3 financials" 
+debo "design an employee onboarding process"
+debo "research market trends in renewable energy"  # Only this reaches out if configured
 ```
 
-## 🎯 Key Benefits
+## 🎯 Open Source Advantages
 
-• **No Learning Curve** - Just speak normally
-• **Enterprise Scale** - Handles complex multi-department tasks
-• **Cost Effective** - Optimized LLM usage reduces operational costs
-• **Always Available** - 24/7 AI workforce
-• **Secure** - Enterprise-grade Redis state management
-• **Fast** - Optimized architecture for maximum performance
+• **Complete Control** - Modify any agent, add custom capabilities
+• **Privacy Guaranteed** - Your data never leaves your machine
+• **Cost Effective** - No per-request charges, no usage limits
+• **Always Available** - No internet required for core functionality
+• **Transparent** - See exactly what each agent is doing
+• **Extensible** - Add new agents, integrate your tools
 
-## 🏗️ Architecture
+## 🏗️ Local Architecture
 
 ```
-CEO Agent (Strategic Analysis)
+Your Machine (Completely Private)
+├── CEO Agent (Strategic Analysis)
 ├── C-Suite (8 Executive Agents)
 │   ├── CFO - Financial Strategy
 │   ├── COO - Operations  
@@ -90,31 +106,63 @@ CEO Agent (Strategic Analysis)
     ├── Marketing (6 agents)
     ├── Operations (6 agents)
     └── HR (6 agents)
+
+All powered by YOUR local Ollama instance
 ```
 
 ## 🔧 System Requirements
 
 • **Node.js** 18+ 
-• **Redis** (auto-installed)
-• **Ollama** (auto-installed with models)
-• **8GB RAM** minimum
+• **8GB RAM** minimum (16GB recommended)
+• **20GB disk space** for models
 • **macOS/Linux** (Windows WSL2 supported)
+• **Internet** only for initial setup and optional external access
+
+## 🌐 When Agents Reach Out (Optional)
+
+Agents only access external resources when:
+• You explicitly request web research
+• You configure API integrations  
+• You enable cloud LLM providers
+
+Examples:
+```bash
+# Stays completely local
+debo "create a node.js API server"
+
+# Will reach out for current information (with your permission)
+debo "research the latest cybersecurity trends"
+debo "get current stock prices for our portfolio"
+```
 
 ## 📊 Performance Stats
 
 • **Startup Time**: <5 seconds
-• **Task Processing**: Real-time parallel execution
+• **Local Processing**: Real-time parallel execution
 • **Memory Usage**: Optimized with auto-cleanup
-• **Cost Efficiency**: Optimized LLM request management
-• **Reliability**: Enterprise-grade error handling
+• **Zero External Costs** - After initial setup
+• **Unlimited Usage** - No rate limits or quotas
+
+## 🛠️ Customization
+
+```bash
+# Add your own agents
+debo "create a custom agent for inventory management"
+
+# Modify existing agents  
+vim src/agents/fortune500-roles.js
+
+# Configure external access
+vim .env  # Set API keys only if you want external access
+```
 
 ## 🆘 Quick Help
 
 ```bash
-# Check system status
+# Check what's running locally
 debo "system status"
 
-# View agent activity
+# See agent activity  
 debo "show me what all agents are working on"
 
 # Health check
@@ -124,18 +172,38 @@ npm run health
 npm run clean && npm start
 ```
 
+## 🔓 Open Source Benefits
+
+✅ **MIT Licensed** - Use commercially, modify freely  
+✅ **No Vendor Lock-in** - Your system, your rules  
+✅ **Community Driven** - Contribute improvements  
+✅ **Transparent** - Every algorithm visible  
+✅ **Privacy First** - Data stays on your machine  
+✅ **Cost Effective** - No subscription fees  
+
 ## 🎬 Why "Debo"?
 
-Because this system takes over ALL your business tasks - from code to contracts to campaigns. Just like the character, Debo doesn't ask permission, it just gets things done.
+Because this system takes over ALL your business tasks while respecting YOUR ownership. Local processing, open source code, your data stays yours.
 
-*"That's my enterprise workflow, punk!"* 
+*"That's MY enterprise system, running on MY machine!"* 
 
 ---
 
-**Ready to let Debo take over?**
+## 🚀 Get Started
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Kevin-Kurka/Debo/main/install-oneliner.sh | bash
 ```
 
-Your AI workforce is waiting. ⚡
+**Your local AI workforce is waiting. Private, powerful, and completely under your control.** 🔒⚡
+
+---
+
+<div align="center">
+  <p><strong>Open Source • Privacy First • Runs Locally</strong></p>
+  <p>
+    <a href="https://github.com/Kevin-Kurka/Debo/issues">Report Issues</a> •
+    <a href="https://github.com/Kevin-Kurka/Debo/discussions">Community</a> •
+    <a href="LICENSE">MIT License</a>
+  </p>
+</div>
