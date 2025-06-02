@@ -1,16 +1,13 @@
 #!/bin/bash
 
-# Debo One-Liner Installer
+# Debo One-Liner Installer with Real-Time Feedback
 # Usage: curl -fsSL https://raw.githubusercontent.com/Kevin-Kurka/Debo/main/install-oneliner.sh | bash
-# or: wget -qO- https://raw.githubusercontent.com/Kevin-Kurka/Debo/main/install-oneliner.sh | bash
 
 set -euo pipefail
 
 # Script configuration
 REPO_URL="https://github.com/Kevin-Kurka/Debo.git"
-INSTALL_SCRIPT_URL="https://raw.githubusercontent.com/Kevin-Kurka/Debo/main/install.sh"
 INSTALL_DIR="${DEBO_INSTALL_DIR:-$HOME/debo}"
-TEMP_INSTALLER="/tmp/debo-installer-$$.sh"
 
 # Colors
 RED='\033[0;31m'
@@ -21,153 +18,114 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 BOLD='\033[1m'
 
-# Show quick banner
-echo -e "${CYAN}${BOLD}Debo Installer${NC}"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Show banner immediately
+echo -e "${CYAN}${BOLD}"
+cat << 'EOF'
 
-# Error handler
+    ██████╗ ███████╗██████╗  ██████╗ 
+    ██╔══██╗██╔════╝██╔══██╗██╔═══██╗
+    ██║  ██║█████╗  ██████╔╝██║   ██║
+    ██║  ██║██╔══╝  ██╔══██╗██║   ██║
+    ██████╔╝███████╗██████╔╝╚██████╔╝
+    ╚═════╝ ╚══════╝╚═════╝  ╚═════╝ 
+
+    Open Source AI Enterprise System v1.0.0
+
+EOF
+echo -e "${NC}"
+echo -e "${BOLD}🤖 Installing your local AI workforce...${NC}"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# Progress indicator
+spinner() {
+    local pid=$1
+    local delay=0.1
+    local spinstr='|/-\'
+    echo -n "⏳ $2 "
+    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
+        local temp=${spinstr#?}
+        printf "[%c]" "$spinstr"
+        local spinstr=$temp${spinstr%"$temp"}
+        sleep $delay
+        printf "\b\b\b"
+    done
+    echo -e "✅ Done!"
+}
+
+# Error handler with immediate feedback
 handle_error() {
-    echo -e "\n${RED}❌ Installation failed${NC}"
-    echo -e "${YELLOW}💡 Try these alternatives:${NC}"
     echo ""
-    echo "1. Clone and install manually:"
-    echo "   git clone $REPO_URL"
-    echo "   cd debo"
-    echo "   ./install.sh"
+    echo -e "${RED}❌ Installation failed at step: $1${NC}"
     echo ""
-    echo "2. Download installer directly:"
-    echo "   curl -fsSL $INSTALL_SCRIPT_URL -o install.sh"
-    echo "   chmod +x install.sh"
-    echo "   ./install.sh"
+    echo -e "${YELLOW}📋 Quick troubleshooting:${NC}"
+    echo "• Check internet connection"
+    echo "• Ensure you have git installed"
+    echo "• Try running with: bash -x install-oneliner.sh"
     echo ""
-    echo "3. Get help:"
-    echo "   https://github.com/Kevin-Kurka/Debo/issues"
-    
-    # Cleanup
-    rm -f "$TEMP_INSTALLER"
+    echo -e "${BLUE}🔗 Get help: https://github.com/Kevin-Kurka/Debo/issues${NC}"
     exit 1
 }
 
-# Set error trap
-trap handle_error ERR
+# Immediate prerequisite check
+echo "🔍 Checking system requirements..."
+sleep 0.5
 
-# Check prerequisites
-check_prerequisites() {
-    local missing=()
-    
-    # Check for curl or wget
-    if ! command -v curl &>/dev/null && ! command -v wget &>/dev/null; then
-        missing+=("curl or wget")
-    fi
-    
-    # Check for git
-    if ! command -v git &>/dev/null; then
-        missing+=("git")
-    fi
-    
-    if [ ${#missing[@]} -gt 0 ]; then
-        echo -e "${RED}Missing required tools: ${missing[*]}${NC}"
-        echo ""
-        
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            echo "Install with Homebrew:"
-            echo "  /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
-            echo "  brew install ${missing[*]}"
-        elif [[ -f /etc/debian_version ]]; then
-            echo "Install with apt:"
-            echo "  sudo apt update && sudo apt install -y ${missing[*]}"
-        elif [[ -f /etc/redhat-release ]]; then
-            echo "Install with yum:"
-            echo "  sudo yum install -y ${missing[*]}"
-        fi
-        
-        exit 1
-    fi
-}
-
-# Download installer
-download_installer() {
-    echo -e "${BLUE}📥 Downloading Debo installer...${NC}"
-    
-    if command -v curl &>/dev/null; then
-        if curl -fsSL "$INSTALL_SCRIPT_URL" -o "$TEMP_INSTALLER"; then
-            return 0
-        fi
-    fi
-    
-    if command -v wget &>/dev/null; then
-        if wget -qO "$TEMP_INSTALLER" "$INSTALL_SCRIPT_URL"; then
-            return 0
-        fi
-    fi
-    
-    return 1
-}
-
-# Main installation
-main() {
-    # Check prerequisites
-    check_prerequisites
-    
-    # Try to detect if we should clone first
-    if [[ -t 0 ]] && [[ ! -f "./install.sh" ]]; then
-        # Running interactively and not in Debo directory
-        echo -e "${BLUE}📦 Installing Debo...${NC}"
-        echo ""
-        
-        # Option 1: Try to download and run the installer
-        if download_installer; then
-            chmod +x "$TEMP_INSTALLER"
-            echo -e "${GREEN}✅ Installer downloaded${NC}"
-            echo ""
-            
-            # Run the installer
-            exec bash "$TEMP_INSTALLER"
-        else
-            # Option 2: Clone the repository
-            echo -e "${YELLOW}⚠️  Direct download failed, cloning repository...${NC}"
-            
-            if [[ -d "$INSTALL_DIR" ]]; then
-                echo -e "${YELLOW}Found existing installation at $INSTALL_DIR${NC}"
-                read -p "Remove and reinstall? (y/N) " -n 1 -r
-                echo
-                if [[ $REPLY =~ ^[Yy]$ ]]; then
-                    rm -rf "$INSTALL_DIR"
-                else
-                    echo "Installation cancelled"
-                    exit 0
-                fi
-            fi
-            
-            # Clone repository
-            if git clone "$REPO_URL" "$INSTALL_DIR"; then
-                echo -e "${GREEN}✅ Repository cloned${NC}"
-                cd "$INSTALL_DIR"
-                
-                # Run installer from repository
-                if [[ -f "./install.sh" ]]; then
-                    chmod +x ./install.sh
-                    exec ./install.sh
-                else
-                    echo -e "${RED}❌ Installer not found in repository${NC}"
-                    exit 1
-                fi
-            else
-                echo -e "${RED}❌ Failed to clone repository${NC}"
-                exit 1
-            fi
-        fi
+# Check git
+if ! command -v git &>/dev/null; then
+    echo -e "${RED}❌ Git not found${NC}"
+    echo ""
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "Install git with: brew install git"
+    elif [[ -f /etc/debian_version ]]; then
+        echo "Install git with: sudo apt install git"
     else
-        # Being piped or already in directory
-        if download_installer; then
-            chmod +x "$TEMP_INSTALLER"
-            exec bash "$TEMP_INSTALLER"
-        else
-            echo -e "${RED}❌ Failed to download installer${NC}"
-            exit 1
-        fi
+        echo "Please install git and try again"
     fi
-}
+    exit 1
+fi
+echo "✅ Git found"
 
-# Run main
-main "$@"
+# Check Node.js
+if ! command -v node &>/dev/null; then
+    echo "⚠️  Node.js not found (will be installed later)"
+else
+    NODE_VERSION=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
+    if [ "$NODE_VERSION" -ge 18 ]; then
+        echo "✅ Node.js $NODE_VERSION found"
+    else
+        echo "⚠️  Node.js version too old (will be updated)"
+    fi
+fi
+
+echo ""
+
+# Remove existing installation if found
+if [[ -d "$INSTALL_DIR" ]]; then
+    echo -e "${YELLOW}📂 Found existing Debo installation${NC}"
+    echo "Removing old installation..."
+    rm -rf "$INSTALL_DIR"
+    echo "✅ Cleaned up"
+    echo ""
+fi
+
+# Clone repository with immediate feedback
+echo "📥 Downloading Debo from GitHub..."
+if git clone --quiet "$REPO_URL" "$INSTALL_DIR" 2>/dev/null; then
+    echo "✅ Repository downloaded"
+else
+    handle_error "Repository download"
+fi
+
+# Change to install directory
+cd "$INSTALL_DIR" || handle_error "Directory access"
+
+# Make installer executable
+chmod +x install.sh
+
+echo ""
+echo -e "${GREEN}🚀 Starting Debo installation...${NC}"
+echo ""
+
+# Run the main installer with immediate execution
+exec ./install.sh

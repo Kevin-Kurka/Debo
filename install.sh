@@ -37,10 +37,10 @@ show_banner() {
     ██████╔╝███████╗██████╔╝╚██████╔╝
     ╚═════╝ ╚══════╝╚═════╝  ╚═════╝ 
 
-    Autonomous Development System v3.1.0
+    Open Source AI Enterprise System v1.0.0
 EOF
     echo -e "${NC}"
-    echo -e "${BOLD}🤖 Installing your AI development team...${NC}\n"
+    echo -e "${BOLD}🤖 Installing your local AI workforce...${NC}\n"
 }
 
 # Logging functions
@@ -670,11 +670,24 @@ main() {
     # Show banner
     show_banner
     
+    # Immediate feedback
+    echo "🔍 Analyzing your system..."
+    sleep 0.5
+    
     # Detect environment
     detect_script_mode
     check_root
     detect_os
+    
+    echo "✅ System analysis complete"
+    echo ""
+    echo "⚙️  Checking requirements..."
+    sleep 0.5
+    
     check_system_requirements
+    
+    echo "✅ Requirements check complete"
+    echo ""
     
     # Install prerequisites
     update_progress 10 "Installing prerequisites..."
