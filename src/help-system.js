@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import boxen from 'boxen';
 import figlet from 'figlet';
+import { portManager } from './utils/port-manager.js';
 
 export class HelpSystem {
   constructor() {
@@ -306,7 +307,8 @@ export class HelpSystem {
     
     // Footer
     console.log(chalk.gray('\nFor detailed help on any command, run: ') + chalk.white('debo help <command>'));
-    console.log(chalk.gray('Real-time monitoring available at: ') + chalk.white('http://localhost:3001'));
+    const dashboardPort = portManager.getAssignedPort('dashboard-server') || 'not assigned';
+    console.log(chalk.gray('Real-time monitoring available at: ') + chalk.white(`http://localhost:${dashboardPort}`));
     console.log(chalk.gray('Documentation: ') + chalk.white('https://github.com/Kevin-Kurka/Debo\n'));
   }
 

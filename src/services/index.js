@@ -3,12 +3,18 @@
  * Centralized service exports for the new optimized architecture
  */
 
+import logger from '../logger.js';
+
 // Core Services
 export { default as DatabaseService } from './database-service.js';
 export { default as AgentExecutionEngine } from './agent-execution-engine.js';
 export { default as LLMRequestManager } from './llm-request-manager.js';
 export { default as MemoryManager } from './memory-manager.js';
 export { default as UnifiedOrchestratorService } from './unified-orchestrator-service.js';
+
+// Network Services
+export { default as WebSocketService } from './websocket-service.js';
+export { default as DashboardService } from './dashboard-service.js';
 
 // Service Factory for easy initialization
 export class ServiceFactory {
@@ -19,6 +25,8 @@ export class ServiceFactory {
         const { default: LLMRequestManager } = await import('./llm-request-manager.js');
         const { default: MemoryManager } = await import('./memory-manager.js');
         const { default: UnifiedOrchestratorService } = await import('./unified-orchestrator-service.js');
+        const { default: WebSocketService } = await import('./websocket-service.js');
+        const { default: DashboardService } = await import('./dashboard-service.js');
         
         // Initialize database service first
         const databaseService = new DatabaseService();
@@ -45,12 +53,32 @@ export class ServiceFactory {
         );
         await unifiedOrchestrator.initialize();
         
+        // Initialize network services (optional - can be enabled/disabled)
+        let webSocketService = null;
+        let dashboardService = null;
+        
+        try {
+            webSocketService = new WebSocketService();
+            await webSocketService.initialize();
+        } catch (error) {
+            logger.warn('WebSocket service initialization failed:', error.message);
+        }
+        
+        try {
+            dashboardService = new DashboardService();
+            await dashboardService.initialize();
+        } catch (error) {
+            logger.warn('Dashboard service initialization failed:', error.message);
+        }
+        
         return {
             database: databaseService,
             llmRequest: llmRequestManager,
             memory: memoryManager,
             agentExecution: agentExecutionEngine,
-            orchestrator: unifiedOrchestrator
+            orchestrator: unifiedOrchestrator,
+            webSocket: webSocketService,
+            dashboard: dashboardService
         };
     }
     

@@ -20,7 +20,6 @@
 import { program } from 'commander';
 import { TerminalInterface } from '../src/terminal-interface.js';
 import { TerminalDashboard } from '../src/terminal-dashboard.js';
-import { EnhancedTaskManager } from '../src/database/task-manager.js';
 import { execSync } from 'child_process';
 import chalk from 'chalk';
 import figlet from 'figlet';
@@ -37,12 +36,12 @@ class DeboCLI {
     // Check prerequisites
     await this.checkPrerequisites();
     
-    // Initialize task manager
-    this.taskManager = new EnhancedTaskManager();
-    await this.taskManager.connect();
+    // Initialize services
+    const { ServiceFactory } = await import('../src/services/index.js');
+    this.services = await ServiceFactory.createOptimizedServices();
     
     // Initialize terminal interface
-    this.terminal = new TerminalInterface(this.taskManager);
+    this.terminal = new TerminalInterface(this.services.database);
   }
   
   async checkPrerequisites() {
@@ -78,7 +77,7 @@ class DeboCLI {
     console.log(chalk.cyan(figlet.textSync('DEBO', { font: 'ANSI Shadow' })));
     console.log(chalk.yellow('🚀 Starting terminal dashboard...\n'));
     
-    this.dashboard = new TerminalDashboard(this.taskManager);
+    this.dashboard = new TerminalDashboard(this.services.database);
     
     // Start with a welcome message
     this.dashboard.addLog('info', 'Debo autonomous development system started', 'system');
@@ -190,7 +189,7 @@ class DeboCLI {
   async showStatus() {
     await this.initialize();
     
-    const stats = await this.taskManager.agentQueue.getQueueStats();
+    const stats = await this.services.agentExecution.getStatus();
     
     console.log(chalk.cyan('📊 Debo System Status'));
     console.log(chalk.gray('━'.repeat(50)));
@@ -208,7 +207,7 @@ class DeboCLI {
     
     try {
       const { ProjectPlanner } = await import('../src/codebase/project-planner.js');
-      const planner = new ProjectPlanner(this.taskManager, this.terminal);
+      const planner = new ProjectPlanner(this.services.database, this.terminal);
       
       const projectPlan = await planner.analyzeAndPlan(projectPath);
       
@@ -262,6 +261,36 @@ program
   .action(async () => {
     const cli = new DeboCLI();
     await cli.showStatus();
+  });
+
+program
+  .command('ports')
+  .description('Show port assignments and network information')
+  .action(async () => {
+    const { portManager } = await import('../src/utils/port-manager.js');
+    const portInfo = portManager.getPortInfo();
+    
+    console.log(chalk.cyan('🔌 Debo Port Information'));
+    console.log(chalk.gray('━'.repeat(50)));
+    
+    console.log(chalk.yellow('\n📍 Assigned Ports:'));
+    Object.entries(portInfo.assigned).forEach(([service, port]) => {
+      console.log(`  ${service.padEnd(20)} ${chalk.green(port)}`);
+    });
+    
+    console.log(chalk.yellow('\n🚫 Reserved Ports:'));
+    const reserved = Array.from(portInfo.reserved).slice(0, 10); // Show first 10
+    console.log(`  ${reserved.join(', ')}${portInfo.reserved.length > 10 ? '...' : ''}`);
+    
+    console.log(chalk.yellow('\n📋 Port Ranges:'));
+    Object.entries(portInfo.ranges).forEach(([type, range]) => {
+      console.log(`  ${type.padEnd(12)} ${chalk.blue(range.start)}-${chalk.blue(range.end)}`);
+    });
+    
+    console.log(chalk.yellow('\n💾 Configuration:'));
+    console.log(`  Config file: ${chalk.gray(portInfo.configFile)}`);
+    
+    console.log(chalk.gray('\nNote: Ports are dynamically assigned to avoid conflicts'));
   });
 
 // Terminal command for interactive MCP client

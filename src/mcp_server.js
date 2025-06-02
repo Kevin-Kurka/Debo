@@ -7,6 +7,8 @@
 
 import { ServiceFactory } from './services/index.js';
 import { HelpSystem } from './help-system.js';
+import { config, initializePorts } from './config.js';
+import { portManager } from './utils/port-manager.js';
 import logger from './logger.js';
 import { execSync } from 'child_process';
 import os from 'os';
@@ -48,6 +50,10 @@ class OptimizedDeboMCPServer {
       console.log('\x1b[0m'); // Reset colors
       
       logger.info('🚀 Initializing Optimized Debo MCP Server...');
+      
+      // Initialize dynamic ports first
+      const ports = await initializePorts();
+      logger.info(`📡 Dynamic ports assigned: MCP=${ports.mcpServer}, WS=${ports.websocketServer}, Dashboard=${ports.dashboardServer}`);
       
       // Initialize optimized services
       this.services = await ServiceFactory.createOptimizedServices();
@@ -268,6 +274,22 @@ class OptimizedDeboMCPServer {
   }
 
   handlePing(id) {
+    const serviceStatus = {
+      database: this.services.database.isConnected,
+      memory: this.services.memory.getMemoryStatus(),
+      orchestrator: this.services.orchestrator.getMetrics(),
+      agentExecution: this.services.agentExecution.getStatus()
+    };
+    
+    // Add network services if available
+    if (this.services.webSocket) {
+      serviceStatus.webSocket = this.services.webSocket.getConnectionInfo();
+    }
+    
+    if (this.services.dashboard) {
+      serviceStatus.dashboard = this.services.dashboard.getConnectionInfo();
+    }
+    
     return {
       jsonrpc: "2.0",
       id,
@@ -275,12 +297,8 @@ class OptimizedDeboMCPServer {
         status: "healthy",
         uptime: Date.now() - this.startTime,
         requestCount: this.requestCount,
-        services: {
-          database: this.services.database.isConnected,
-          memory: this.services.memory.getMemoryStatus(),
-          orchestrator: this.services.orchestrator.getMetrics(),
-          agentExecution: this.services.agentExecution.getStatus()
-        }
+        ports: portManager.getAllAssignments(),
+        services: serviceStatus
       }
     };
   }
@@ -347,6 +365,14 @@ class OptimizedDeboMCPServer {
         process.stdin.pause();
         
         // Shutdown services in reverse order
+        if (this.services.dashboard) {
+          await this.services.dashboard.shutdown();
+        }
+        
+        if (this.services.webSocket) {
+          await this.services.webSocket.shutdown();
+        }
+        
         if (this.services.orchestrator) {
           await this.services.orchestrator.shutdown();
         }

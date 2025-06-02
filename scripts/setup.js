@@ -85,6 +85,15 @@ async function setupDebo() {
         thinking: 'qwen2.5:14b',
         fast: 'qwen2.5:7b'
       },
+      ports: {
+        dynamic: true,
+        ranges: {
+          mcp: '8000-8099',
+          websocket: '8100-8199',
+          api: '8200-8299',
+          monitoring: '8400-8499'
+        }
+      },
       directories: {
         projects: projectsDir,
         logs: logsDir
@@ -121,6 +130,10 @@ async function setupDebo() {
     console.log('   • debo create my-app "Build a task management app with React"');
     console.log('   • debo develop my-app "Add user authentication"');
     console.log('   • debo status my-app');
+    console.log('\n📡 Port Management:');
+    console.log('   • Ports are automatically assigned to avoid conflicts');
+    console.log('   • Use "debo ports" to see current assignments');
+    console.log('   • Set environment variables to override (e.g., MCP_SERVER_PORT=8000)');
     
   } catch (error) {
     console.error('\n❌ Setup failed:', error.message);

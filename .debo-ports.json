@@ -1,0 +1,8 @@
+{
+  "ports": {
+    "mcp-server": 3000,
+    "websocket-server": 8100,
+    "dashboard-server": 8400
+  },
+  "timestamp": "2025-06-02T22:27:13.795Z"
+}
