@@ -1,23 +1,15 @@
 {
   "name": "debo",
-  "version": "3.0.0",
+  "version": "1.0.0",
   "type": "module",
-  "description": "Debo - Fortune 500 Enterprise AI System with 54 Business Agents and LangGraph Workflows",
+  "description": "Debo - Enterprise AI System with 54 Business Agents",
   "main": "src/mcp_server.js",
   "bin": {
     "debo": "./bin/debo.js"
   },
   "scripts": {
     "start": "node src/mcp_server.js",
-    "start:v2": "node src/mcp_server_v2.js",
-    "start:generic": "node src/mcp_server_generic.js",
-    "start:optimized": "node src/mcp_server_optimized.js",
-    "start:ui": "DEBO_TERMINAL_UI=true node src/mcp_server.js",
     "dev": "nodemon src/mcp_server.js",
-    "dev:v2": "nodemon src/mcp_server_v2.js",
-    "dev:generic": "nodemon src/mcp_server_generic.js",
-    "dev:optimized": "nodemon src/mcp_server_optimized.js",
-    "dev:ui": "DEBO_TERMINAL_UI=true nodemon src/mcp_server.js",
     "setup": "node scripts/setup.js",
     "test": "jest",
     "test:watch": "jest --watch",

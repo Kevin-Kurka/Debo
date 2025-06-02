@@ -13,6 +13,13 @@ export { default as UnifiedOrchestratorService } from './unified-orchestrator-se
 // Service Factory for easy initialization
 export class ServiceFactory {
     static async createOptimizedServices() {
+        // Import services dynamically to avoid circular dependencies
+        const { default: DatabaseService } = await import('./database-service.js');
+        const { default: AgentExecutionEngine } = await import('./agent-execution-engine.js');
+        const { default: LLMRequestManager } = await import('./llm-request-manager.js');
+        const { default: MemoryManager } = await import('./memory-manager.js');
+        const { default: UnifiedOrchestratorService } = await import('./unified-orchestrator-service.js');
+        
         // Initialize database service first
         const databaseService = new DatabaseService();
         await databaseService.initialize();

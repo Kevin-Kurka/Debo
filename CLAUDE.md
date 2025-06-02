@@ -4,171 +4,109 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Debo is a Fortune 500 Enterprise AI System that provides a complete company structure with 54 specialized business agents. It uses a single natural language interface to handle ANY business task - from software development to financial forecasting, HR management, legal compliance, and strategic planning. The system implements LangGraph-style workflows with full Redis state management.
+Debo is an Enterprise AI System with 54 specialized business agents that handle ANY task through natural language. The system provides a complete Fortune 500 company structure optimized for performance and cost efficiency.
 
 ## Common Development Commands
 
 ### Setup and Running
 ```bash
-npm install                      # Install dependencies
-npm run setup                    # Initial setup (Redis, Ollama models, system config)
-npm run start:generic            # Start Fortune 500 Enterprise system (recommended)
-npm run dev:generic              # Start with nodemon for development
-
-# Legacy commands (still available)
-npm start                        # Original MCP server
-npm run dev                      # Original dev mode
+npm install              # Install dependencies  
+npm run setup           # Initial setup (Redis, Ollama models, system config)
+npm start               # Start optimized enterprise system
+npm run dev             # Start with nodemon for development
 ```
 
-### Testing
+### Testing and Quality
 ```bash
-npm test                         # Run Jest tests
-npm run test:watch              # Watch mode
-npm run test:coverage           # Coverage report
-npm run test:unit               # Unit tests only
-
-# Run specific business system tests
-node test-business-system.js     # Test Fortune 500 capabilities
-node test-generic-system.js      # Test generic agent creation
+npm test                # Run tests
+npm run health          # Check system health
+npm run clean           # Clean up old data
 ```
 
-### Utilities
+### Using Debo
 ```bash
-npm run health                   # System health check
-npm run clean                    # Clean old Redis data
-./start-generic.sh              # Quick start script with status display
+# Single command for everything
+debo "your request in natural language"
+
+# Examples
+debo "create a REST API with authentication"
+debo "prepare Q3 financial statements"
+debo "design employee onboarding workflow" 
+debo "analyze our competitive market position"
 ```
 
 ## High-Level Architecture
 
-### Fortune 500 Enterprise Structure
-
+### Enterprise Structure (54 Agents)
 ```
-Fortune500Orchestrator (src/core/fortune500-orchestrator.js)
-├── C-Suite Executives (8 agents - GPT-4/GPT-3.5)
-│   ├── CEO - Overall strategy and decision making
-│   ├── CFO - Financial strategy and risk management
-│   ├── COO - Operations and efficiency
-│   ├── CTO - Technology strategy
-│   ├── CMO - Marketing and brand
-│   ├── CHRO - People and culture
-│   ├── CLO - Legal and compliance
-│   └── CRO - Revenue and sales
+CEO Agent (Strategic Analysis)
+├── C-Suite (8 Executive Agents)
+│   ├── CFO - Financial Strategy
+│   ├── COO - Operations  
+│   ├── CTO - Technology
+│   ├── CMO - Marketing
+│   ├── CHRO - Human Resources
+│   ├── CLO - Legal
+│   └── CRO - Revenue
 │
-└── Departments (46 specialized agents)
-    ├── Finance (8) - Controllers, CPAs, Analysts
-    ├── Operations (6) - Supply Chain, Quality, Project Mgmt
-    ├── HR (6) - Talent, Compensation, Training
-    ├── Legal (6) - Attorneys, Compliance, IP
-    ├── Sales (6) - Directors, Account Execs, Customer Success
-    ├── Marketing (6) - Brand, Product, Digital
-    ├── Strategy (5) - Research, Competitive Intel
-    └── Engineering (11) - Original dev team + business awareness
+└── Departments (46 Specialist Agents)
+    ├── Finance (8 agents)
+    ├── Engineering (11 agents) 
+    ├── Legal (6 agents)
+    ├── Sales (6 agents)
+    ├── Marketing (6 agents)
+    ├── Operations (6 agents)
+    └── HR (6 agents)
 ```
 
 ### Core Components
 
-1. **MCP Interface** (`src/mcp_server_generic.js`)
-   - Single `debo` tool for ALL requests
-   - Natural language understanding
-   - Automatic routing to appropriate agents
-   - JSON-RPC protocol implementation
+1. **MCP Server** (`src/mcp_server.js`): Main entry point with optimized performance
+2. **Unified Services** (`src/services/`): Consolidated database, LLM, and orchestration services
+3. **Agent System** (`src/agents/`): All 54 business agents with specialized roles
+4. **Quality Gateway** (`src/core/quality-gateway.js`): Automated quality checks
+5. **Redis State Management**: All agent data shared through optimized Redis operations
 
-2. **Fortune500Orchestrator** (`src/core/fortune500-orchestrator.js`)
-   - Extends GenericOrchestrator
-   - CEO analyzes all requests first
-   - Routes through corporate hierarchy
-   - Manages cross-department collaboration
-
-3. **Workflow Engine** (`src/core/workflow-engine.js`)
-   - LangGraph-style state management
-   - Parallel task execution
-   - Human approval gates
-   - Checkpoint/recovery support
-   - Business workflow templates
-
-4. **Department Manager** (`src/agents/department-manager.js`)
-   - Coordinates department-level workflows
-   - Manages specialized agent pools
-   - Handles inter-department communication
-
-5. **Enhanced Agent Executor** (`src/agents/enhanced-executor.js`)
-   - Full Redis integration for data sharing
-   - Context preservation across agents
-   - Deliverable storage and retrieval
-
-### Business Request Flow
-
+### Request Flow
 1. User sends natural language request via `debo` tool
 2. CEO agent analyzes and determines scope
-3. Relevant C-suite executives provide strategic input
-4. Work delegated to appropriate departments
-5. Specialized agents execute tasks in parallel
-6. Department heads review work
-7. Results aggregated and returned
+3. Work delegated to appropriate departments
+4. Specialized agents execute tasks in parallel
+5. Results aggregated and returned with quality checks
 
-### Redis Data Architecture
+### Database Schema
+Redis with optimized structure:
+- `project:{id}`: Project metadata
+- `task:{id}`: Task details and results
+- `agent:{id}:state`: Agent execution state
+- `workflow:{id}`: Business workflow data
 
-```
-company:{metric}              # Company KPIs and metrics
-department:{name}:{data}      # Department-specific data
-workflow:{id}:state          # Active workflow states
-workflow:{id}:checkpoints    # Workflow snapshots
-agent:{id}:context          # Agent execution contexts
-task:{id}:results           # Task outputs
-decision:{id}              # Strategic decisions with rationale
-approval:{id}              # Pending approvals
-```
+## Key Design Patterns
+- **Single Tool Interface**: Everything through one `debo` command
+- **Optimized Services**: Consolidated architecture for 3x performance
+- **Event-driven execution**: Asynchronous task coordination
+- **Quality-first**: Automated checks for all deliverables
+- **Enterprise-grade**: Redis state management and error recovery
 
-## Key Capabilities
+## Development Guidelines
 
-### Business Operations
-- Financial forecasting, budgeting, and reporting
-- HR management: recruiting, onboarding, retention
-- Legal compliance and contract management
-- Sales pipeline and customer success
-- Marketing campaigns and brand strategy
-- Operations optimization and supply chain
-- Strategic planning and market analysis
+### When Adding Features
+1. Use the optimized services architecture
+2. Ensure all agents use proper Redis integration
+3. Follow the single tool design pattern
+4. Add appropriate quality checks
 
-### Technical Features
-- 54 specialized agents with business expertise
-- LangGraph workflows with state persistence
-- Parallel execution across departments
-- Human-in-the-loop approvals
-- Full audit trail in Redis
-- Cross-department data sharing
-- Business objective optimization
+### Performance Optimization
+- All services are enterprise-optimized
+- Use batch operations for database access
+- Implement proper error handling and recovery
+- Monitor agent performance through built-in metrics
 
-## Important Implementation Notes
-
-### Single Tool Design
-The system uses ONLY the `debo` tool - no separate dialogue or query tools. Everything is handled through natural language context.
-
-### Agent Communication
-All agents use EnhancedAgentExecutor for proper Redis integration. Data is shared through structured Redis keys, enabling true collaboration.
-
-### Workflow Management
-The WorkflowEngine supports complex business processes with branching, approvals, and checkpoints. Common patterns include financial approvals, product launches, and hiring workflows.
-
-### Error Handling
-Comprehensive error recovery with retry strategies, pattern matching, and escalation to senior agents when needed.
-
-## Testing Business Capabilities
-
-```bash
-# Test financial operations
-debo "prepare Q3 financial statements with variance analysis"
-
-# Test HR workflows  
-debo "create employee onboarding process for engineers"
-
-# Test strategic planning
-debo "analyze market entry opportunities in Europe"
-
-# Test cross-functional
-debo "plan product launch with budget and marketing strategy"
-```
+### Working with Agents
+- All agents use the unified agent execution engine
+- State is automatically persisted to Redis
+- Follow existing agent role patterns
+- Ensure deliverables are properly structured
 
 ## Environment Variables
 
@@ -176,22 +114,12 @@ Required in `.env`:
 ```bash
 REDIS_URL=redis://localhost:6379
 OLLAMA_BASE_URL=http://localhost:11434
-ENABLE_BUSINESS_MODE=true
-WORKFLOW_ENGINE=langgraph
 ```
 
-## Recent Architectural Changes
+## Important Notes
 
-1. **Simplified to Single Tool** - Removed debo_dialogue and debo_query
-2. **Fortune 500 Structure** - Added complete business agent hierarchy
-3. **LangGraph Workflows** - Implemented stateful business processes
-4. **Enhanced Redis Usage** - All agents share state properly
-5. **Business Intelligence** - Agents understand and optimize for business objectives
-
-## Key Files for Business System
-
-- `src/agents/fortune500-roles.js` - All 54 business agent definitions
-- `src/core/fortune500-orchestrator.js` - Corporate hierarchy orchestration
-- `src/core/workflow-engine.js` - LangGraph-style workflows
-- `src/agents/department-manager.js` - Department coordination
-- `BUSINESS-SYSTEM-README.md` - Comprehensive business documentation
+1. **Single Installation**: Only one optimized version - no legacy systems
+2. **Performance**: Enterprise-grade optimization for speed and cost efficiency
+3. **Simplicity**: One command (`debo`) handles everything
+4. **Enterprise-grade**: Designed for business use across all domains
+5. **Natural Language**: No complex syntax or configuration required
