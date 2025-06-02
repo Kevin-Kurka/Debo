@@ -27,6 +27,11 @@ export class EnhancedAgentExecutor {
     this.activeExecutions = new Map();
   }
 
+  async init() {
+    // Initialize database integration if needed
+    logger.info('Enhanced Agent Executor initialized');
+  }
+
   async executeAgent(agentId, task) {
     const executionId = uuidv4();
     logger.info(`Starting agent execution: ${agentId} for task: ${task.id}`);

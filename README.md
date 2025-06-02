@@ -110,8 +110,11 @@ debo "design an experiment to test the effects of pH on enzyme activity"
 # Business Process
 debo "create a customer onboarding workflow with KYC compliance"
 
-# Agent Creation
-debo "create an agent that specializes in patent analysis"
+# Business Operations
+debo "prepare our quarterly earnings report"
+debo "create a competitive analysis for the cloud storage market"
+debo "design an employee retention program"
+debo "optimize our supply chain for Q4 demand"
 ```
 
 *"You want some of this too, old man?"* - Debo to your manual processes

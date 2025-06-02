@@ -331,6 +331,37 @@ Always:
 5. Maintain confidentiality and ethical standards`;
   }
 
+  generateTaskAnalysisPrompt(domain) {
+    return `Analyze the given task to determine:
+1. Whether it falls within the ${domain} domain
+2. What specific ${domain} expertise is required
+3. Key components or subtasks involved
+4. Potential challenges or considerations
+5. Required outputs or deliverables
+
+Provide a structured analysis.`;
+  }
+
+  generateExecutionPrompt(domain) {
+    return `Execute the given ${domain} task following best practices:
+1. Apply domain-specific methodologies
+2. Ensure compliance with ${domain} standards
+3. Document your approach and reasoning
+4. Provide clear, actionable outputs
+5. Include relevant references or citations`;
+  }
+
+  generateValidationPrompt(domain) {
+    return `Validate the completed work for:
+1. Accuracy and correctness within ${domain} standards
+2. Completeness of deliverables
+3. Compliance with requirements
+4. Quality and professionalism
+5. Any areas needing revision
+
+Provide a validation report with specific feedback.`;
+  }
+
   /**
    * Load dynamic agents from Redis
    */

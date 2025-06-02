@@ -1,189 +1,222 @@
 #!/usr/bin/env node
 
 /**
- * Generic MCP Server for Debo
+ * Debo MCP Server - Single Tool Interface
  * 
  * PURPOSE:
- * Enhanced MCP server that supports dynamic agent creation and
- * handles any type of request, not just software development.
+ * Simplified MCP server with a single 'debo' tool that handles all requests
+ * through natural language, backed by a comprehensive Fortune 500-style agent system.
  * 
  * FEATURES:
- * - Natural language understanding for any domain
- * - Dynamic agent creation through dialogue
- * - Custom data schema support
- * - Knowledge management with RAG
- * - Conversational clarification
+ * - Single natural language interface
+ * - Fortune 500 company structure with specialized departments
+ * - Redis-based state management for all agents
+ * - LangGraph-style workflow orchestration
+ * - Real-time progress monitoring via WebSocket
  * 
- * TECHNICAL DETAILS:
- * - Uses GenericOrchestrator instead of UnifiedOrchestrator
- * - Supports dialogue-based interactions
- * - Maintains conversation context
- * - Enables domain-agnostic processing
+ * AGENT HIERARCHY:
+ * - Executive: CEO, CTO, CFO, COO
+ * - Management: Department heads and managers
+ * - Specialists: Domain experts and execution agents
+ * - Support: Administrative and operational roles
  */
 
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { TaskManager } from './database/task-manager.js';
-import { GenericOrchestrator } from './core/generic-orchestrator.js';
+import { EnhancedTaskManager } from './database/task-manager.js';
+import { Fortune500Orchestrator } from './core/fortune500-orchestrator.js';
 import { LLMProvider } from './infrastructure/llm-provider.js';
-import { WebSocketServer } from './websocket-server.js';
+import { WebSocketServer } from './websocket-server-wrapper.js';
 import logger from './logger.js';
-import fs from 'fs/promises';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { v4 as uuidv4 } from 'uuid';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-class GenericDeboServer {
+class DeboMCPServer {
   constructor() {
-    this.server = new Server({
-      name: 'debo-generic',
-      version: '2.0.0',
-    }, {
-      capabilities: {
-        tools: {},
-        resources: {}
-      }
-    });
-    
     this.taskManager = null;
     this.orchestrator = null;
     this.llmProvider = null;
     this.websocketServer = null;
-    this.activeDialogues = new Map();
+    this.sessionContext = new Map();
+    this.initialized = false;
     
-    this.setupHandlers();
+    // Setup stdin/stdout handling
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', this.handleRequest.bind(this));
+    process.stdin.resume();
   }
 
-  setupHandlers() {
-    this.server.setRequestHandler('tools/list', async () => ({
-      tools: [
-        {
-          name: 'debo',
-          description: `Debo - Your universal AI orchestrator. I can:
-• Create custom AI agents for any domain (legal, medical, scientific, etc.)
-• Build software applications from natural language descriptions
-• Answer questions and manage knowledge across domains
-• Handle complex workflows and data management
-• Learn and adapt to your specific needs
-
-Just describe what you want in natural language!`,
-          inputSchema: {
-            type: 'object',
-            properties: {
-              request: {
-                type: 'string',
-                description: 'Your request in natural language'
-              },
-              context: {
-                type: 'object',
-                description: 'Optional context (projectId, domain, etc.)',
-                properties: {
-                  projectId: { type: 'string' },
-                  domain: { type: 'string' },
-                  dialogueId: { type: 'string' }
-                }
-              }
-            },
-            required: ['request']
-          }
-        },
-        {
-          name: 'debo_dialogue',
-          description: 'Continue an active dialogue with Debo (for agent creation or clarifications)',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              dialogueId: {
-                type: 'string',
-                description: 'The dialogue ID from previous response'
-              },
-              response: {
-                type: 'string',
-                description: 'Your response to Debo\'s questions'
-              }
-            },
-            required: ['dialogueId', 'response']
-          }
-        },
-        {
-          name: 'debo_query',
-          description: 'Query Debo\'s knowledge base or stored data',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              query: {
-                type: 'string',
-                description: 'Your query'
-              },
-              domain: {
-                type: 'string',
-                description: 'Optional: specific domain to search'
-              },
-              agentId: {
-                type: 'string',
-                description: 'Optional: specific agent\'s data to query'
-              }
-            },
-            required: ['query']
-          }
-        }
-      ]
-    }));
-
-    this.server.setRequestHandler('tools/call', async (request) => {
-      const { name, arguments: args } = request.params;
-
-      try {
-        switch (name) {
-          case 'debo':
-            return await this.handleDeboRequest(args);
-            
-          case 'debo_dialogue':
-            return await this.handleDialogue(args);
-            
-          case 'debo_query':
-            return await this.handleQuery(args);
-            
-          default:
-            throw new Error(`Unknown tool: ${name}`);
-        }
-      } catch (error) {
-        logger.error('Tool execution error:', error);
-        return {
-          content: [{
-            type: 'text',
-            text: `Error: ${error.message}\n\nTry rephrasing your request or providing more context.`
-          }]
-        };
+  async handleRequest(data) {
+    try {
+      const trimmed = data.trim();
+      if (!trimmed) return; // Ignore empty input
+      
+      const request = JSON.parse(trimmed);
+      logger.debug(`Received request: ${request.method}`);
+      let response = null;
+      
+      switch (request.method) {
+        case 'initialize':
+          response = await this.handleInitialize(request);
+          break;
+        case 'tools/list':
+          response = await this.handleToolsList(request);
+          break;
+        case 'tools/call':
+          response = await this.handleToolsCall(request);
+          break;
+        default:
+          response = this.errorResponse(request.id, `Unknown method: ${request.method}`);
       }
-    });
+      
+      if (response) {
+        process.stdout.write(JSON.stringify(response) + '\n');
+      }
+    } catch (error) {
+      logger.error('Request handling error:', error);
+      const errorResponse = this.errorResponse(null, 'Parse error: ' + error.message);
+      process.stdout.write(JSON.stringify(errorResponse) + '\n');
+    }
+  }
+
+  async handleInitialize(request) {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+    
+    return {
+      jsonrpc: '2.0',
+      id: request.id,
+      result: {
+        protocolVersion: '2024-11-05',
+        capabilities: {
+          tools: {}
+        },
+        serverInfo: {
+          name: 'debo',
+          version: '3.0.0',
+          description: 'Enterprise AI System with Fortune 500 Structure'
+        }
+      }
+    };
+  }
+
+  async handleToolsList(request) {
+    return {
+      jsonrpc: '2.0',
+      id: request.id,
+      result: {
+        tools: [
+          {
+            name: 'debo',
+            description: `Debo - Enterprise AI System with Fortune 500 Structure
+
+I manage a complete corporate hierarchy of AI agents:
+
+🏢 EXECUTIVE LEVEL:
+• CEO: Strategic vision and company direction
+• CTO: Technology strategy and innovation
+• CFO: Financial planning and analysis
+• COO: Operations and efficiency
+
+👔 DEPARTMENT HEADS:
+• Engineering, Product, Sales, Marketing, HR, Legal, Finance
+• Customer Success, R&D, Business Development, IT
+
+👥 SPECIALIZED TEAMS:
+• Software Development (Frontend, Backend, Mobile, DevOps)
+• Data & Analytics (Scientists, Engineers, Analysts)
+• Creative (Designers, Writers, Video, Audio)
+• Operations (Project Management, QA, Security)
+
+🤖 CAPABILITIES:
+• Build complete software applications
+• Analyze business strategies
+• Create marketing campaigns
+• Handle legal and compliance
+• Manage financial planning
+• Conduct market research
+• And much more!
+
+Just tell me what you need in natural language!`,
+            inputSchema: {
+              type: 'object',
+              properties: {
+                request: {
+                  type: 'string',
+                  description: 'What would you like Debo to do? Examples: "Build a SaaS application", "Analyze market opportunities", "Create a marketing strategy", "Review this contract", "Plan company expansion"'
+                }
+              },
+              required: ['request']
+            }
+          }
+        ]
+      }
+    };
+  }
+
+  async handleToolsCall(request) {
+    const { name, arguments: args } = request.params;
+    
+    if (name !== 'debo') {
+      return this.errorResponse(request.id, `Unknown tool: ${name}`);
+    }
+    
+    try {
+      const result = await this.handleDeboRequest(args);
+      return {
+        jsonrpc: '2.0',
+        id: request.id,
+        result
+      };
+    } catch (error) {
+      logger.error('Tool execution error:', error);
+      return this.errorResponse(request.id, error.message);
+    }
+  }
+
+  errorResponse(id, message) {
+    return {
+      jsonrpc: '2.0',
+      id: id || null,
+      error: {
+        code: -32603,
+        message: message
+      }
+    };
   }
 
   async initialize() {
+    if (this.initialized) return;
+    
     try {
-      // Initialize task manager
-      this.taskManager = new TaskManager();
-      await this.taskManager.init();
+      // Initialize enhanced task manager with Redis
+      this.taskManager = new EnhancedTaskManager();
+      await this.taskManager.connect();
 
       // Initialize LLM provider
-      this.llmProvider = new LLMProvider(this.taskManager);
+      this.llmProvider = new LLMProvider();
       await this.llmProvider.init();
 
       // Initialize WebSocket server for real-time updates
-      this.websocketServer = new WebSocketServer(3001);
+      // Use dynamic port allocation to avoid conflicts
+      const wsPort = process.env.WS_PORT || 0; // 0 = let OS assign available port
+      this.websocketServer = new WebSocketServer(parseInt(wsPort));
       await this.websocketServer.init();
+      const actualWsPort = this.websocketServer.port;
 
-      // Initialize generic orchestrator
-      this.orchestrator = new GenericOrchestrator(
+      // Initialize Fortune 500 orchestrator
+      this.orchestrator = new Fortune500Orchestrator(
         this.taskManager,
         this.llmProvider,
         this.websocketServer
       );
       await this.orchestrator.init();
 
-      logger.info('Generic Debo MCP Server initialized successfully');
+      this.initialized = true;
+      
+      logger.info('🏢 Debo Fortune 500 AI System initialized');
+      logger.info('📊 Departments online: Executive, Engineering, Product, Sales, Marketing, Legal, Finance, HR, Operations');
+      logger.info('🤖 Total agents available: 50+ specialized roles');
+      logger.info('🔗 Redis state management: Connected');
+      logger.info(`📡 Real-time monitoring: http://localhost:${actualWsPort}`);
     } catch (error) {
       logger.error('Failed to initialize server:', error);
       throw error;
@@ -191,176 +224,162 @@ Just describe what you want in natural language!`,
   }
 
   async handleDeboRequest(args) {
-    const { request, context = {} } = args;
+    const { request } = args;
+    const sessionId = uuidv4();
     
-    logger.info(`Processing request: ${request.substring(0, 100)}...`);
+    logger.info(`\n🎯 New request received: "${request.substring(0, 100)}${request.length > 100 ? '...' : ''}"`);
+    logger.info(`📋 Session ID: ${sessionId}`);
     
     try {
-      const result = await this.orchestrator.processGenericRequest(request, context);
+      // Store session context
+      this.sessionContext.set(sessionId, {
+        request,
+        startTime: Date.now(),
+        status: 'processing'
+      });
+
+      // CEO analyzes request and delegates to appropriate departments
+      const executiveAnalysis = await this.orchestrator.executiveAnalysis(request, sessionId);
       
-      // Format response based on result type
-      return this.formatResponse(result);
+      // Process through appropriate department workflow
+      const result = await this.orchestrator.processThroughDepartments(
+        executiveAnalysis,
+        sessionId
+      );
+      
+      // Update session status
+      const session = this.sessionContext.get(sessionId);
+      session.status = 'completed';
+      session.duration = Date.now() - session.startTime;
+      
+      // Format response with corporate structure
+      return this.formatCorporateResponse(result, session);
       
     } catch (error) {
-      logger.error('Request processing error:', error);
-      throw error;
-    }
-  }
-
-  async handleDialogue(args) {
-    const { dialogueId, response } = args;
-    
-    logger.info(`Continuing dialogue: ${dialogueId}`);
-    
-    try {
-      const result = await this.orchestrator.continueDialogue(dialogueId, response);
+      logger.error(`❌ Request processing error: ${error.message}`);
       
-      return this.formatResponse(result);
-      
-    } catch (error) {
-      logger.error('Dialogue error:', error);
-      throw error;
-    }
-  }
-
-  async handleQuery(args) {
-    const { query, domain, agentId } = args;
-    
-    logger.info(`Processing query: ${query}`);
-    
-    try {
-      let result;
-      
-      if (agentId) {
-        // Query specific agent's data
-        const data = await this.orchestrator.dynamicAgentManager.queryAgentData(
-          agentId,
-          'all',
-          { query }
-        );
-        
-        result = {
-          type: 'query_result',
-          data,
-          count: data.length,
-          agentId
-        };
-      } else {
-        // General knowledge query
-        result = await this.orchestrator.handleKnowledgeQuery(
-          { query, domain },
-          {}
-        );
+      // Update session with error
+      const session = this.sessionContext.get(sessionId);
+      if (session) {
+        session.status = 'failed';
+        session.error = error.message;
       }
       
-      return this.formatResponse(result);
-      
-    } catch (error) {
-      logger.error('Query error:', error);
       throw error;
     }
   }
 
-  formatResponse(result) {
-    let content = [];
+  formatCorporateResponse(result, session) {
+    const { departments, workflow, deliverables, summary } = result;
     
-    switch (result.type) {
-      case 'dialogue':
-      case 'clarification':
-        content.push({
-          type: 'text',
-          text: `${result.message}\n\n${result.questions.map((q, i) => `${i + 1}. ${q}`).join('\n')}\n\n**Dialogue ID:** ${result.dialogueId}\n\nUse the \`debo_dialogue\` tool to respond.`
-        });
-        break;
-        
-      case 'agent_needed':
-        content.push({
-          type: 'text',
-          text: `${result.message}\n\nSuggested agent:\n- **Domain:** ${result.suggestedAgent.domain}\n- **Name:** ${result.suggestedAgent.name}\n- **Capabilities:** ${result.suggestedAgent.capabilities.join(', ')}\n\nRespond with "yes" to create this agent or describe what you need differently.`
-        });
-        break;
-        
-      case 'task_result':
-        content.push({
-          type: 'text',
-          text: `✅ Task completed successfully!\n\n**Agent Used:** ${result.agentUsed}\n**Task ID:** ${result.taskId}\n**Confidence:** ${(result.confidence * 100).toFixed(0)}%\n\n**Result:**\n${result.result}`
-        });
-        
-        if (result.storedEntities?.length > 0) {
-          content.push({
-            type: 'text',
-            text: `\n**Stored Data:** ${result.storedEntities.join(', ')}`
-          });
+    let response = `✅ **Request Completed Successfully**\n`;
+    response += `⏱️ Processing Time: ${(session.duration / 1000).toFixed(1)}s\n`;
+    response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    
+    // Executive Summary
+    response += `📊 **Executive Summary**\n`;
+    response += `${summary}\n\n`;
+    
+    // Departments Involved
+    response += `🏢 **Departments Engaged**\n`;
+    departments.forEach(dept => {
+      response += `• **${dept.name}**: ${dept.role}\n`;
+      if (dept.agents?.length > 0) {
+        response += `  Agents: ${dept.agents.join(', ')}\n`;
+      }
+    });
+    response += `\n`;
+    
+    // Workflow Executed
+    if (workflow?.stages?.length > 0) {
+      response += `📋 **Workflow Stages**\n`;
+      workflow.stages.forEach((stage, index) => {
+        const status = stage.status === 'completed' ? '✅' : '🔄';
+        response += `${index + 1}. ${status} ${stage.name}\n`;
+        if (stage.deliverables?.length > 0) {
+          response += `   Deliverables: ${stage.deliverables.join(', ')}\n`;
         }
-        break;
-        
-      case 'knowledge_response':
-        content.push({
-          type: 'text',
-          text: `**Answer:** ${result.response}\n\n**Confidence:** ${(result.confidence * 100).toFixed(0)}%\n**Sources:** ${result.sources.map(s => s.title).join(', ')}`
-        });
-        
-        if (result.relatedTopics?.length > 0) {
-          content.push({
-            type: 'text',
-            text: `\n**Related Topics:** ${result.relatedTopics.join(', ')}`
-          });
-        }
-        break;
-        
-      case 'project_created':
-        content.push({
-          type: 'text',
-          text: `🚀 Project "${result.projectName}" created!\n\n**Project ID:** ${result.projectId}\n**Requirements:** ${result.requirements}\n\n✨ Development has started! Monitor progress at http://localhost:3001\n\nThe AI team is now working on your project. You'll see real-time updates as each agent completes their tasks.`
-        });
-        break;
-        
-      case 'direct_response':
-        content.push({
-          type: 'text',
-          text: result.response
-        });
-        break;
-        
-      case 'task_complete':
-        content.push({
-          type: 'text',
-          text: `✅ Task completed!\n\n**Summary:** ${result.summary}\n\n**Details:**\n${result.results.map(r => `- ${r.subtask}: ✓`).join('\n')}`
-        });
-        break;
-        
-      default:
-        // Generic response formatting
-        content.push({
-          type: 'text',
-          text: JSON.stringify(result, null, 2)
-        });
+      });
+      response += `\n`;
     }
     
-    return { content };
+    // Key Deliverables
+    if (deliverables && Object.keys(deliverables).length > 0) {
+      response += `📦 **Deliverables**\n`;
+      for (const [type, items] of Object.entries(deliverables)) {
+        response += `\n**${type}**:\n`;
+        if (Array.isArray(items)) {
+          items.forEach(item => {
+            response += `• ${item}\n`;
+          });
+        } else if (typeof items === 'object') {
+          response += `\`\`\`json\n${JSON.stringify(items, null, 2)}\n\`\`\`\n`;
+        } else {
+          response += `${items}\n`;
+        }
+      }
+    }
+    
+    // Real-time monitoring
+    const wsPort = this.websocketServer?.port || 'N/A';
+    response += `\n📡 **Live Monitoring**: http://localhost:${wsPort}\n`;
+    response += `🔍 **Session ID**: ${sessionId}\n`;
+    
+    return {
+      content: [{
+        type: 'text',
+        text: response
+      }]
+    };
+  }
+
+  async cleanup() {
+    logger.info('🔄 Cleaning up server resources...');
+    
+    try {
+      // Clear session contexts
+      this.sessionContext.clear();
+      
+      // Close connections
+      if (this.taskManager?.redis) {
+        await this.taskManager.redis.quit();
+      }
+      await this.websocketServer?.close();
+      await this.orchestrator?.cleanup();
+      
+      logger.info('✅ Cleanup completed');
+    } catch (error) {
+      logger.error('❌ Cleanup error:', error);
+    }
   }
 
   async start() {
-    await this.initialize();
+    if (!this.initialized) {
+      await this.initialize();
+    }
     
-    const transport = new StdioServerTransport();
-    await this.server.connect(transport);
-    
-    logger.info('Generic Debo MCP Server started - ready for any request!');
+    logger.info('\n🚀 Debo MCP Server Started!');
+    logger.info('🏢 Fortune 500 AI Corporation Ready');
+    logger.info('💼 All departments standing by...');
+    logger.info('📡 Monitoring: http://localhost:3001\n');
     
     // Cleanup on exit
     process.on('SIGINT', async () => {
-      logger.info('Shutting down server...');
-      await this.taskManager?.cleanup();
-      await this.websocketServer?.close();
+      logger.info('\n📴 Shutting down Debo server...');
+      await this.cleanup();
+      process.exit(0);
+    });
+    
+    process.on('SIGTERM', async () => {
+      await this.cleanup();
       process.exit(0);
     });
   }
 }
 
 // Start server
-const server = new GenericDeboServer();
+const server = new DeboMCPServer();
 server.start().catch(error => {
-  logger.error('Failed to start server:', error);
+  logger.error('❌ Failed to start server:', error);
   process.exit(1);
 });

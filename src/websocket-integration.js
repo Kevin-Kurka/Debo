@@ -57,7 +57,10 @@ export class WebSocketIntegration {
           logger.error('Failed to start WebSocket server', error);
           reject(error);
         } else {
-          logger.info(`WebSocket server listening on port ${this.port}`);
+          // Get actual port (in case 0 was used for dynamic allocation)
+          const actualPort = this.server.address().port;
+          this.port = actualPort;
+          logger.info(`WebSocket server listening on port ${actualPort}`);
           resolve(this.websocketServer);
         }
       });
