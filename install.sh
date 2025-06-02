@@ -698,44 +698,63 @@ main() {
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     fi
     
+    echo "📦 Installing Node.js..."
     install_nodejs
     update_progress 20 "Node.js ready"
+    echo ""
     
+    echo "🗄️  Installing Redis database..."
     install_redis
     update_progress 30 "Redis ready"
+    echo ""
     
+    echo "🤖 Installing Ollama AI platform..."
     install_ollama
     update_progress 40 "Ollama ready"
+    echo ""
     
     # Setup Debo
-    echo
+    echo "🏗️  Setting up Debo repository..."
     update_progress 50 "Setting up Debo..."
     setup_debo_repository
+    echo ""
     
+    echo "📚 Installing npm dependencies..."
     update_progress 60 "Installing dependencies..."
     install_dependencies
+    echo ""
     
+    echo "⚙️  Configuring system..."
     update_progress 70 "Configuring system..."
     setup_configuration
+    echo ""
     
+    echo "🔧 Setting up shell integration..."
     update_progress 80 "Setting up commands..."
     setup_shell_integration
+    echo ""
     
+    echo "🚀 Running initial setup scripts..."
     update_progress 90 "Running initial setup..."
     run_initial_setup
+    echo ""
     
     # Final steps
-    echo
+    echo "🧠 Downloading AI models (this may take a few minutes)..."
     update_progress 95 "Downloading AI models..."
-    echo
+    echo ""
     download_models
+    echo ""
     
-    echo
+    echo "🧪 Testing installation..."
     update_progress 98 "Testing installation..."
     test_installation
+    echo ""
     
+    echo "📝 Generating configurations..."
     update_progress 99 "Generating configurations..."
     generate_mcp_config
+    echo ""
     
     update_progress 100 "Complete!"
     echo
