@@ -18,7 +18,11 @@ npm run dev             # Start with nodemon for development
 
 ### Testing and Quality
 ```bash
-npm test                # Run tests (placeholder - tests coming soon)
+npm test                # Run all tests with Jest
+npm run test:watch      # Run tests in watch mode
+npm run test:coverage   # Generate test coverage report
+npm run test:unit       # Run unit tests only
+npm run test:integration # Run integration tests
 npm run health          # Check system health
 npm run clean           # Clean up old data
 ```
@@ -94,26 +98,47 @@ Uses Redis with structured keys:
 
 ## Development Guidelines
 
+### Prerequisites for Development
+- **Redis Server**: Must be running locally (`redis-server`)
+- **Ollama**: Required for local AI models (auto-installed via `npm run setup`)
+- **Node.js 18+**: Required for ES modules and modern features
+
 ### When Adding New Features
 1. Consider which agent(s) should handle the work
 2. Update the orchestrator if new workflows are needed
 3. Ensure quality checks are included for code-producing tasks
 4. Add appropriate logging for monitoring
+5. Write tests following the Jest configuration in `jest.config.js`
 
 ### When Modifying Agents
 1. Maintain the separation between thinking and fast agents
 2. Follow the existing prompt structure in `src/agents/roles.js`
 3. Ensure deliverables are properly stored in the database
 4. Update agent capabilities in the orchestrator
+5. Test with both unit and integration tests
 
 ### Working with Redis
 - All project state is stored in Redis for persistence
 - Use the TaskManager class for database operations
 - Follow existing key naming conventions
 - Clean up old data periodically with `npm run clean`
+- Redis connection includes automatic retry logic
+
+### Testing Guidelines
+- Tests use ES modules (`.js` files with `type: "module"`)
+- Mock utilities available in `tests/setup.js`
+- Set `DEBUG_TESTS=1` to enable console output during testing
+- Use `npm run test:watch` for active development
 
 ### Error Handling
 - The system includes comprehensive error handling and recovery
 - Failed tasks are logged with detailed error information
 - Agents can retry failed operations with exponential backoff
 - Monitor logs in the `logs/` directory for debugging
+- Error recovery manager prevents circular error loops
+
+### MCP Integration
+- The system implements Model Context Protocol for AI tool integration
+- Main server entry point: `src/mcp_server.js`
+- Tools are managed through `src/tools/manager.js`
+- Custom MCP tools can be added via the tool registry

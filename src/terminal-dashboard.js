@@ -124,4 +124,355 @@ export class TerminalDashboard {
         type: 'line'
       },
       style: {
-        fg: 'white',\n        border: {\n          fg: 'blue'\n        }\n      },\n      scrollable: true,\n      alwaysScroll: true\n    });\n    \n    // Log Stream (bottom panel)\n    this.widgets.logs = blessed.log({\n      top: '55%',\n      left: 0,\n      width: '100%',\n      height: '40%',\n      label: ' 📝 Real-time Logs ',\n      tags: true,\n      border: {\n        type: 'line'\n      },\n      style: {\n        fg: 'white',\n        border: {\n          fg: 'magenta'\n        }\n      },\n      scrollable: true,\n      alwaysScroll: true,\n      mouse: true\n    });\n    \n    // Status Bar (bottom)\n    this.widgets.status = blessed.box({\n      bottom: 0,\n      left: 0,\n      width: '100%',\n      height: 1,\n      content: this.getStatusContent(),\n      tags: true,\n      style: {\n        fg: 'black',\n        bg: 'white'\n      }\n    });\n    \n    // Add all widgets to screen\n    Object.values(this.widgets).forEach(widget => {\n      this.screen.append(widget);\n    });\n    \n    // Focus on logs by default\n    this.widgets.logs.focus();\n  }\n  \n  getHeaderContent() {\n    const uptime = ((performance.now() - this.startTime) / 1000 / 60).toFixed(1);\n    return [\n      '{center}{bold}{cyan-fg}🤖 DEBO - Autonomous Development System{/}',\n      '{center}{gray-fg}Fortune 500 Agent Architecture with Real-time Monitoring{/}',\n      `{center}{yellow-fg}Uptime: ${uptime}m • Memory: ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(1)}MB • PID: ${process.pid}{/}`\n    ].join('\\n');\n  }\n  \n  getStatusContent() {\n    const now = new Date().toLocaleTimeString();\n    return ` ${now} | Press 'q' to quit | 'r' to refresh | 'c' to clear logs | 'h' for help `;\n  }\n  \n  setupKeyHandlers() {\n    // Quit on Escape, q, or C-c\n    this.screen.key(['escape', 'q', 'C-c'], () => {\n      this.shutdown();\n    });\n    \n    // Refresh on 'r'\n    this.screen.key(['r'], () => {\n      this.refresh();\n    });\n    \n    // Clear logs on 'c'\n    this.screen.key(['c'], () => {\n      this.clearLogs();\n    });\n    \n    // Help on 'h'\n    this.screen.key(['h'], () => {\n      this.showHelp();\n    });\n    \n    // Tab to cycle focus\n    this.screen.key(['tab'], () => {\n      this.cycleFocus();\n    });\n  }\n  \n  setupAutoRefresh() {\n    // Refresh display every second\n    setInterval(() => {\n      this.updateDisplay();\n    }, 1000);\n    \n    // Update status bar more frequently\n    setInterval(() => {\n      this.widgets.status.setContent(this.getStatusContent());\n      this.widgets.header.setContent(this.getHeaderContent());\n      this.screen.render();\n    }, 500);\n  }\n  \n  addLog(level, message, source = 'system') {\n    const timestamp = new Date().toLocaleTimeString();\n    const coloredMessage = this.formatLogMessage(level, message, source, timestamp);\n    \n    this.logs.push({\n      timestamp,\n      level,\n      message,\n      source,\n      formatted: coloredMessage\n    });\n    \n    // Keep log buffer manageable\n    if (this.logs.length > this.maxLogs) {\n      this.logs.shift();\n    }\n    \n    // Add to log widget\n    this.widgets.logs.log(coloredMessage);\n    this.screen.render();\n  }\n  \n  formatLogMessage(level, message, source, timestamp) {\n    const icons = {\n      error: '❌',\n      warn: '⚠️',\n      info: 'ℹ️',\n      success: '✅',\n      debug: '🔍',\n      agent: '🤖',\n      command: '🚀',\n      llm: '🧠'\n    };\n    \n    const colors = {\n      error: 'red',\n      warn: 'yellow',\n      info: 'blue',\n      success: 'green',\n      debug: 'gray',\n      agent: 'cyan',\n      command: 'magenta',\n      llm: 'purple'\n    };\n    \n    const icon = icons[level] || 'ℹ️';\n    const color = colors[level] || 'white';\n    \n    return `{${color}-fg}${icon} {gray-fg}[${timestamp}]{/} {bold}${source}:{/} ${message}{/}`;\n  }\n  \n  updateAgentStatus(agents) {\n    const content = agents.map(agent => {\n      const statusIcon = agent.status === 'active' ? '{green-fg}🟢{/}' : '{red-fg}🔴{/}';\n      const role = `{bold}{yellow-fg}${agent.role.padEnd(18)}{/}`;\n      const task = agent.currentTask ? \n        `{gray-fg}${agent.currentTask.slice(0, 25)}...{/}` : \n        '{gray-fg}Idle{/}';\n      \n      const confidence = agent.lastConfidence ? \n        `{cyan-fg}${agent.lastConfidence}%{/}` : \n        '{gray-fg}--{/}';\n      \n      return `${statusIcon} ${role}\\n    Task: ${task}\\n    Confidence: ${confidence}\\n`;\n    }).join('\\n');\n    \n    this.widgets.agents.setContent(content);\n  }\n  \n  updateCommandExecution(commands) {\n    const content = commands.map(cmd => {\n      const statusIcon = cmd.status === 'running' ? \n        '{yellow-fg}⏳{/}' : \n        cmd.status === 'completed' ? '{green-fg}✅{/}' : '{red-fg}❌{/}';\n      \n      const duration = cmd.duration ? `{gray-fg}(${cmd.duration}s){/}` : '';\n      const command = `{bold}${cmd.command.slice(0, 40)}...{/}`;\n      \n      return `${statusIcon} ${command} ${duration}`;\n    }).slice(-10).join('\\n'); // Show last 10 commands\n    \n    this.widgets.commands.setContent(content);\n  }\n  \n  updateProjectStatus(projectData) {\n    const progressBar = this.createProgressBar(projectData.progress || 0);\n    \n    const content = [\n      `{bold}{yellow-fg}Project:{/} ${projectData.name || 'Unknown'}`,\n      `{bold}Progress:{/} ${progressBar} ${projectData.progress || 0}%`,\n      `{bold}Tasks:{/} {green-fg}${projectData.completed || 0}{/}/{cyan-fg}${projectData.total || 0}{/}`,\n      `{bold}Active Agents:{/} {cyan-fg}${projectData.activeAgents || 0}{/}`,\n      `{bold}ETA:{/} {gray-fg}${projectData.eta || 'Unknown'}{/}`,\n      '',\n      '{bold}Recent Activity:{/}',\n      ...(projectData.recentActivity || []).map(activity => \n        `  {gray-fg}• ${activity}{/}`\n      )\n    ].join('\\n');\n    \n    this.widgets.project.setContent(content);\n  }\n  \n  createProgressBar(percentage, width = 20) {\n    const filled = Math.round((percentage / 100) * width);\n    const empty = width - filled;\n    \n    return `{green-fg}${'█'.repeat(filled)}{/}{gray-fg}${'░'.repeat(empty)}{/}`;\n  }\n  \n  showCommand(commandId, description, command) {\n    this.addLog('command', `Starting: ${description}`, 'exec');\n    this.addLog('debug', `Command: ${command}`, 'exec');\n  }\n  \n  showCommandOutput(commandId, output, error = false) {\n    const level = error ? 'error' : 'debug';\n    const lines = output.split('\\n').filter(line => line.trim());\n    \n    lines.forEach(line => {\n      this.addLog(level, line, 'output');\n    });\n  }\n  \n  showCommandComplete(commandId, success, duration) {\n    const level = success ? 'success' : 'error';\n    const message = success ? \n      `Command completed in ${duration}s` : \n      `Command failed after ${duration}s`;\n    \n    this.addLog(level, message, 'exec');\n  }\n  \n  showAgentActivity(agentId, role, activity) {\n    this.addLog('agent', `${role}: ${activity}`, agentId);\n  }\n  \n  showLLMActivity(model, tokens, confidence) {\n    this.addLog('llm', `${model} • ${tokens} tokens • ${confidence}% confidence`, 'llm');\n  }\n  \n  showError(error, context) {\n    this.addLog('error', `${context}: ${error.message}`, 'system');\n    if (error.stack) {\n      this.addLog('debug', error.stack, 'system');\n    }\n  }\n  \n  cycleFocus() {\n    const focusableWidgets = [\n      this.widgets.logs,\n      this.widgets.agents,\n      this.widgets.commands,\n      this.widgets.project\n    ];\n    \n    const currentIndex = focusableWidgets.findIndex(w => w === this.screen.focused);\n    const nextIndex = (currentIndex + 1) % focusableWidgets.length;\n    \n    focusableWidgets[nextIndex].focus();\n    this.screen.render();\n  }\n  \n  clearLogs() {\n    this.logs = [];\n    this.widgets.logs.setContent('');\n    this.addLog('info', 'Logs cleared', 'system');\n  }\n  \n  showHelp() {\n    const helpContent = [\n      '{center}{bold}{cyan-fg}Debo Terminal Dashboard Help{/}',\n      '',\n      '{bold}Keyboard Shortcuts:{/}',\n      '  {yellow-fg}q, ESC, Ctrl+C{/} - Quit application',\n      '  {yellow-fg}r{/} - Refresh display',\n      '  {yellow-fg}c{/} - Clear logs',\n      '  {yellow-fg}h{/} - Show this help',\n      '  {yellow-fg}Tab{/} - Cycle focus between panels',\n      '',\n      '{bold}Panels:{/}',\n      '  {cyan-fg}Agent Status{/} - Real-time agent activity',\n      '  {yellow-fg}Command Execution{/} - System commands and output',\n      '  {blue-fg}Project Status{/} - Project progress and metrics',\n      '  {magenta-fg}Real-time Logs{/} - All system activity logs',\n      '',\n      '{gray-fg}Press any key to close help...{/}'\n    ].join('\\n');\n    \n    const helpBox = blessed.box({\n      top: 'center',\n      left: 'center',\n      width: 60,\n      height: 20,\n      content: helpContent,\n      tags: true,\n      border: {\n        type: 'double'\n      },\n      style: {\n        fg: 'white',\n        border: {\n          fg: 'cyan'\n        }\n      }\n    });\n    \n    this.screen.append(helpBox);\n    helpBox.focus();\n    \n    helpBox.key(['escape', 'enter', 'space'], () => {\n      this.screen.remove(helpBox);\n      this.widgets.logs.focus();\n      this.screen.render();\n    });\n    \n    this.screen.render();\n  }\n  \n  updateDisplay() {\n    // Update all panels with fresh data\n    // In a real implementation, you'd fetch this data from your task manager\n    this.screen.render();\n  }\n  \n  refresh() {\n    this.screen.realloc();\n    this.updateDisplay();\n    this.addLog('info', 'Display refreshed', 'system');\n  }\n  \n  shutdown() {\n    this.addLog('info', 'Shutting down dashboard...', 'system');\n    this.screen.destroy();\n    process.exit(0);\n  }\n  \n  render() {\n    this.screen.render();\n  }\n}\n\nexport default TerminalDashboard;\n
+        fg: 'white',
+        border: {
+          fg: 'blue'
+        }
+      },
+      scrollable: true,
+      alwaysScroll: true
+    });
+    
+    // Log Stream (bottom panel)
+    this.widgets.logs = blessed.log({
+      top: '55%',
+      left: 0,
+      width: '100%',
+      height: '40%',
+      label: ' 📝 Real-time Logs ',
+      tags: true,
+      border: {
+        type: 'line'
+      },
+      style: {
+        fg: 'white',
+        border: {
+          fg: 'magenta'
+        }
+      },
+      scrollable: true,
+      alwaysScroll: true,
+      mouse: true
+    });
+    
+    // Status Bar (bottom)
+    this.widgets.status = blessed.box({
+      bottom: 0,
+      left: 0,
+      width: '100%',
+      height: 1,
+      content: this.getStatusContent(),
+      tags: true,
+      style: {
+        fg: 'black',
+        bg: 'white'
+      }
+    });
+    
+    // Add all widgets to screen
+    Object.values(this.widgets).forEach(widget => {
+      this.screen.append(widget);
+    });
+    
+    // Focus on logs by default
+    this.widgets.logs.focus();
+  }
+  
+  getHeaderContent() {
+    const uptime = ((performance.now() - this.startTime) / 1000 / 60).toFixed(1);
+    return [
+      '{center}{bold}{cyan-fg}🤖 DEBO - Autonomous Development System{/}',
+      '{center}{gray-fg}Fortune 500 Agent Architecture with Real-time Monitoring{/}',
+      `{center}{yellow-fg}Uptime: ${uptime}m • Memory: ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(1)}MB • PID: ${process.pid}{/}`
+    ].join('\n');
+  }
+  
+  getStatusContent() {
+    const now = new Date().toLocaleTimeString();
+    return ` ${now} | Press 'q' to quit | 'r' to refresh | 'c' to clear logs | 'h' for help `;
+  }
+  
+  setupKeyHandlers() {
+    // Quit on Escape, q, or C-c
+    this.screen.key(['escape', 'q', 'C-c'], () => {
+      this.shutdown();
+    });
+    
+    // Refresh on 'r'
+    this.screen.key(['r'], () => {
+      this.refresh();
+    });
+    
+    // Clear logs on 'c'
+    this.screen.key(['c'], () => {
+      this.clearLogs();
+    });
+    
+    // Help on 'h'
+    this.screen.key(['h'], () => {
+      this.showHelp();
+    });
+    
+    // Tab to cycle focus
+    this.screen.key(['tab'], () => {
+      this.cycleFocus();
+    });
+  }
+  
+  setupAutoRefresh() {
+    // Refresh display every second
+    setInterval(() => {
+      this.updateDisplay();
+    }, 1000);
+    
+    // Update status bar more frequently
+    setInterval(() => {
+      this.widgets.status.setContent(this.getStatusContent());
+      this.widgets.header.setContent(this.getHeaderContent());
+      this.screen.render();
+    }, 500);
+  }
+  
+  addLog(level, message, source = 'system') {
+    const timestamp = new Date().toLocaleTimeString();
+    const coloredMessage = this.formatLogMessage(level, message, source, timestamp);
+    
+    this.logs.push({
+      timestamp,
+      level,
+      message,
+      source,
+      formatted: coloredMessage
+    });
+    
+    // Keep log buffer manageable
+    if (this.logs.length > this.maxLogs) {
+      this.logs.shift();
+    }
+    
+    // Add to log widget
+    this.widgets.logs.log(coloredMessage);
+    this.screen.render();
+  }
+  
+  formatLogMessage(level, message, source, timestamp) {
+    const icons = {
+      error: '❌',
+      warn: '⚠️',
+      info: 'ℹ️',
+      success: '✅',
+      debug: '🔍',
+      agent: '🤖',
+      command: '🚀',
+      llm: '🧠'
+    };
+    
+    const colors = {
+      error: 'red',
+      warn: 'yellow',
+      info: 'blue',
+      success: 'green',
+      debug: 'gray',
+      agent: 'cyan',
+      command: 'magenta',
+      llm: 'purple'
+    };
+    
+    const icon = icons[level] || 'ℹ️';
+    const color = colors[level] || 'white';
+    
+    return `{${color}-fg}${icon} {gray-fg}[${timestamp}]{/} {bold}${source}:{/} ${message}{/}`;
+  }
+  
+  updateAgentStatus(agents) {
+    const content = agents.map(agent => {
+      const statusIcon = agent.status === 'active' ? '{green-fg}🟢{/}' : '{red-fg}🔴{/}';
+      const role = `{bold}{yellow-fg}${agent.role.padEnd(18)}{/}`;
+      const task = agent.currentTask ? 
+        `{gray-fg}${agent.currentTask.slice(0, 25)}...{/}` : 
+        '{gray-fg}Idle{/}';
+      
+      const confidence = agent.lastConfidence ? 
+        `{cyan-fg}${agent.lastConfidence}%{/}` : 
+        '{gray-fg}--{/}';
+      
+      return `${statusIcon} ${role}\n    Task: ${task}\n    Confidence: ${confidence}\n`;
+    }).join('\n');
+    
+    this.widgets.agents.setContent(content);
+  }
+  
+  updateCommandExecution(commands) {
+    const content = commands.map(cmd => {
+      const statusIcon = cmd.status === 'running' ? 
+        '{yellow-fg}⏳{/}' : 
+        cmd.status === 'completed' ? '{green-fg}✅{/}' : '{red-fg}❌{/}';
+      
+      const duration = cmd.duration ? `{gray-fg}(${cmd.duration}s){/}` : '';
+      const command = `{bold}${cmd.command.slice(0, 40)}...{/}`;
+      
+      return `${statusIcon} ${command} ${duration}`;
+    }).slice(-10).join('\n'); // Show last 10 commands
+    
+    this.widgets.commands.setContent(content);
+  }
+  
+  updateProjectStatus(projectData) {
+    const progressBar = this.createProgressBar(projectData.progress || 0);
+    
+    const content = [
+      `{bold}{yellow-fg}Project:{/} ${projectData.name || 'Unknown'}`,
+      `{bold}Progress:{/} ${progressBar} ${projectData.progress || 0}%`,
+      `{bold}Tasks:{/} {green-fg}${projectData.completed || 0}{/}/{cyan-fg}${projectData.total || 0}{/}`,
+      `{bold}Active Agents:{/} {cyan-fg}${projectData.activeAgents || 0}{/}`,
+      `{bold}ETA:{/} {gray-fg}${projectData.eta || 'Unknown'}{/}`,
+      '',
+      '{bold}Recent Activity:{/}',
+      ...(projectData.recentActivity || []).map(activity => 
+        `  {gray-fg}• ${activity}{/}`
+      )
+    ].join('\n');
+    
+    this.widgets.project.setContent(content);
+  }
+  
+  createProgressBar(percentage, width = 20) {
+    const filled = Math.round((percentage / 100) * width);
+    const empty = width - filled;
+    
+    return `{green-fg}${'█'.repeat(filled)}{/}{gray-fg}${'░'.repeat(empty)}{/}`;
+  }
+  
+  showCommand(commandId, description, command) {
+    this.addLog('command', `Starting: ${description}`, 'exec');
+    this.addLog('debug', `Command: ${command}`, 'exec');
+  }
+  
+  showCommandOutput(commandId, output, error = false) {
+    const level = error ? 'error' : 'debug';
+    const lines = output.split('\n').filter(line => line.trim());
+    
+    lines.forEach(line => {
+      this.addLog(level, line, 'output');
+    });
+  }
+  
+  showCommandComplete(commandId, success, duration) {
+    const level = success ? 'success' : 'error';
+    const message = success ? 
+      `Command completed in ${duration}s` : 
+      `Command failed after ${duration}s`;
+    
+    this.addLog(level, message, 'exec');
+  }
+  
+  showAgentActivity(agentId, role, activity) {
+    this.addLog('agent', `${role}: ${activity}`, agentId);
+  }
+  
+  showLLMActivity(model, tokens, confidence) {
+    this.addLog('llm', `${model} • ${tokens} tokens • ${confidence}% confidence`, 'llm');
+  }
+  
+  showError(error, context) {
+    this.addLog('error', `${context}: ${error.message}`, 'system');
+    if (error.stack) {
+      this.addLog('debug', error.stack, 'system');
+    }
+  }
+  
+  cycleFocus() {
+    const focusableWidgets = [
+      this.widgets.logs,
+      this.widgets.agents,
+      this.widgets.commands,
+      this.widgets.project
+    ];
+    
+    const currentIndex = focusableWidgets.findIndex(w => w === this.screen.focused);
+    const nextIndex = (currentIndex + 1) % focusableWidgets.length;
+    
+    focusableWidgets[nextIndex].focus();
+    this.screen.render();
+  }
+  
+  clearLogs() {
+    this.logs = [];
+    this.widgets.logs.setContent('');
+    this.addLog('info', 'Logs cleared', 'system');
+  }
+  
+  showHelp() {
+    const helpContent = [
+      '{center}{bold}{cyan-fg}Debo Terminal Dashboard Help{/}',
+      '',
+      '{bold}Keyboard Shortcuts:{/}',
+      '  {yellow-fg}q, ESC, Ctrl+C{/} - Quit application',
+      '  {yellow-fg}r{/} - Refresh display',
+      '  {yellow-fg}c{/} - Clear logs',
+      '  {yellow-fg}h{/} - Show this help',
+      '  {yellow-fg}Tab{/} - Cycle focus between panels',
+      '',
+      '{bold}Panels:{/}',
+      '  {cyan-fg}Agent Status{/} - Real-time agent activity',
+      '  {yellow-fg}Command Execution{/} - System commands and output',
+      '  {blue-fg}Project Status{/} - Project progress and metrics',
+      '  {magenta-fg}Real-time Logs{/} - All system activity logs',
+      '',
+      '{gray-fg}Press any key to close help...{/}'
+    ].join('\n');
+    
+    const helpBox = blessed.box({
+      top: 'center',
+      left: 'center',
+      width: 60,
+      height: 20,
+      content: helpContent,
+      tags: true,
+      border: {
+        type: 'double'
+      },
+      style: {
+        fg: 'white',
+        border: {
+          fg: 'cyan'
+        }
+      }
+    });
+    
+    this.screen.append(helpBox);
+    helpBox.focus();
+    
+    helpBox.key(['escape', 'enter', 'space'], () => {
+      this.screen.remove(helpBox);
+      this.widgets.logs.focus();
+      this.screen.render();
+    });
+    
+    this.screen.render();
+  }
+  
+  updateDisplay() {
+    // Update all panels with fresh data
+    // In a real implementation, you'd fetch this data from your task manager
+    this.screen.render();
+  }
+  
+  refresh() {
+    this.screen.realloc();
+    this.updateDisplay();
+    this.addLog('info', 'Display refreshed', 'system');
+  }
+  
+  shutdown() {
+    this.addLog('info', 'Shutting down dashboard...', 'system');
+    this.screen.destroy();
+    process.exit(0);
+  }
+  
+  render() {
+    this.screen.render();
+  }
+}
+
+export default TerminalDashboard;

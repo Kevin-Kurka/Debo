@@ -92,12 +92,12 @@ export class TerminalInterface {
       originalError(...args);
     };
     
-    // Setup custom logger hook
-    if (logger && logger.stream) {
-      logger.stream.on('log', (entry) => {
-        this.addLog(entry.level, entry.message);
-      });
-    }
+    // Setup custom logger hook (winston doesn't have a stream property, so we'll skip this)
+    // if (logger && logger.stream) {
+    //   logger.stream.on('log', (entry) => {
+    //     this.addLog(entry.level, entry.message);
+    //   });
+    // }
   }
   
   addLog(level, message) {

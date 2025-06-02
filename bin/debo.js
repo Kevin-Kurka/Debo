@@ -1,1 +1,315 @@
-#!/usr/bin/env node\n\n/**\n * Debo CLI Entry Point\n * \n * PURPOSE:\n * Command-line interface for the Debo autonomous development system.\n * Provides terminal-based interaction with real-time feedback.\n * \n * FEATURES:\n * - Terminal dashboard interface\n * - Real-time command execution\n * - Agent monitoring\n * - Project progress tracking\n * \n * TODO:\n * - None\n */\n\nimport { program } from 'commander';\nimport { TerminalInterface } from '../src/terminal-interface.js';\nimport { TerminalDashboard } from '../src/terminal-dashboard.js';\nimport { EnhancedTaskManager } from '../src/database/task-manager.js';\nimport { execSync } from 'child_process';\nimport chalk from 'chalk';\nimport figlet from 'figlet';\nimport ora from 'ora';\n\nclass DeboCLI {\n  constructor() {\n    this.taskManager = null;\n    this.terminal = null;\n    this.dashboard = null;\n  }\n  \n  async initialize() {\n    // Check prerequisites\n    await this.checkPrerequisites();\n    \n    // Initialize task manager\n    this.taskManager = new EnhancedTaskManager();\n    await this.taskManager.connect();\n    \n    // Initialize terminal interface\n    this.terminal = new TerminalInterface(this.taskManager);\n  }\n  \n  async checkPrerequisites() {\n    const checks = [\n      {\n        name: 'Redis',\n        command: 'redis-cli ping',\n        error: 'Redis server is not running. Please start Redis first.'\n      },\n      {\n        name: 'Ollama',\n        command: 'curl -s http://localhost:11434/api/tags',\n        error: 'Ollama is not running. Please start Ollama first.'\n      }\n    ];\n    \n    for (const check of checks) {\n      const spinner = ora(`Checking ${check.name}...`).start();\n      \n      try {\n        execSync(check.command, { stdio: 'pipe' });\n        spinner.succeed(`${check.name} is running`);\n      } catch (error) {\n        spinner.fail(check.error);\n        process.exit(1);\n      }\n    }\n  }\n  \n  async runDashboard() {\n    await this.initialize();\n    \n    console.log(chalk.cyan(figlet.textSync('DEBO', { font: 'ANSI Shadow' })));\n    console.log(chalk.yellow('🚀 Starting terminal dashboard...\\n'));\n    \n    this.dashboard = new TerminalDashboard(this.taskManager);\n    \n    // Start with a welcome message\n    this.dashboard.addLog('info', 'Debo autonomous development system started', 'system');\n    this.dashboard.addLog('info', 'Terminal dashboard initialized', 'system');\n    this.dashboard.addLog('info', 'Ready for development requests', 'system');\n    \n    // Render the dashboard\n    this.dashboard.render();\n    \n    return this.dashboard;\n  }\n  \n  async executeRequest(request, options = {}) {\n    await this.initialize();\n    \n    if (options.dashboard) {\n      await this.runDashboard();\n    }\n    \n    // Show request processing\n    this.terminal.addLog('info', `Processing request: ${request}`);\n    \n    // Execute the autonomous development request\n    const commandId = `request_${Date.now()}`;\n    \n    try {\n      this.terminal.startCommand(\n        commandId,\n        'Processing autonomous development request',\n        `debo: ${request}`\n      );\n      \n      // Here you would integrate with your MCP server\n      // For now, we'll simulate the process\n      \n      // Step 1: Project analysis\n      this.terminal.updateCommand(commandId, 'Analyzing project requirements...');\n      await this.simulateStep('Project analysis', 2000);\n      \n      // Step 2: Agent assignment\n      this.terminal.updateCommand(commandId, 'Assigning agents to tasks...');\n      await this.simulateStep('Agent assignment', 1500);\n      \n      // Step 3: Code generation\n      this.terminal.updateCommand(commandId, 'Generating code with AI agents...');\n      await this.simulateStep('Code generation', 3000);\n      \n      // Step 4: Testing\n      this.terminal.updateCommand(commandId, 'Running tests and validation...');\n      await this.simulateStep('Testing', 2000);\n      \n      // Step 5: Documentation\n      this.terminal.updateCommand(commandId, 'Generating documentation...');\n      await this.simulateStep('Documentation', 1000);\n      \n      this.terminal.completeCommand(commandId, true, 'Request completed successfully');\n      \n      this.terminal.showSuccess(\n        `Request \"${request}\" completed successfully!\\n` +\n        'Check the generated files and documentation.'\n      );\n      \n    } catch (error) {\n      this.terminal.completeCommand(commandId, false, error.message);\n      this.terminal.showErrorDetails(error, `Request: ${request}`);\n    }\n  }\n  \n  async simulateStep(stepName, duration) {\n    this.terminal.addLog('info', `Starting ${stepName}...`);\n    \n    return new Promise(resolve => {\n      setTimeout(() => {\n        this.terminal.addLog('success', `${stepName} completed`);\n        resolve();\n      }, duration);\n    });\n  }\n  \n  async runHealthCheck() {\n    await this.initialize();\n    \n    console.log(chalk.cyan('🔍 Debo Health Check'));\n    console.log(chalk.gray('━'.repeat(50)));\n    \n    // Check all systems\n    const healthChecks = [\n      'Redis connection',\n      'Ollama LLM service',\n      'Agent queue system',\n      'Documentation system',\n      'Git integration',\n      'Feedback system'\n    ];\n    \n    for (const check of healthChecks) {\n      const spinner = ora(`Checking ${check}...`).start();\n      \n      // Simulate health check\n      await new Promise(resolve => setTimeout(resolve, 500));\n      \n      spinner.succeed(`${check} is healthy`);\n    }\n    \n    console.log(chalk.green('\\n✅ All systems operational!'));\n    console.log(chalk.gray('Debo is ready for autonomous development.'));\n  }\n  \n  async showStatus() {\n    await this.initialize();\n    \n    const stats = await this.taskManager.agentQueue.getQueueStats();\n    \n    console.log(chalk.cyan('📊 Debo System Status'));\n    console.log(chalk.gray('━'.repeat(50)));\n    console.log(chalk.yellow(`Active Agents: ${stats.activeAgents || 0}`));\n    console.log(chalk.blue(`Queued Tasks: ${stats.queuedTasks || 0}`));\n    console.log(chalk.green(`Completed Tasks: ${stats.completedTasks || 0}`));\n    console.log(chalk.magenta(`System Uptime: ${process.uptime().toFixed(0)}s`));\n    console.log(chalk.gray(`Memory Usage: ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(1)}MB`));\n  }\n  \n  async analyzeAndPlan(projectPath) {\n    await this.initialize();\n    \n    console.log(chalk.cyan('🔍 Starting comprehensive codebase analysis...'));\n    \n    try {\n      const { ProjectPlanner } = await import('../src/codebase/project-planner.js');\n      const planner = new ProjectPlanner(this.taskManager, this.terminal);\n      \n      const projectPlan = await planner.analyzeAndPlan(projectPath);\n      \n      console.log(chalk.green('\\n🎉 Project analysis and planning completed!'));\n      console.log(chalk.cyan('📋 You can now monitor progress with \"debo dashboard\"'));\n      \n      return projectPlan;\n      \n    } catch (error) {\n      console.error(chalk.red(`Analysis failed: ${error.message}`));\n      throw error;\n    }\n  }\n}\n\n// Setup CLI commands\nprogram\n  .name('debo')\n  .description('Debo - Autonomous Development System')\n  .version('2.0.0');\n\nprogram\n  .command('dashboard')\n  .alias('dash')\n  .description('Launch the terminal dashboard interface')\n  .action(async () => {\n    const cli = new DeboCLI();\n    await cli.runDashboard();\n  });\n\nprogram\n  .command('build <request>')\n  .description('Execute an autonomous development request')\n  .option('-d, --dashboard', 'Show dashboard during execution')\n  .action(async (request, options) => {\n    const cli = new DeboCLI();\n    await cli.executeRequest(request, options);\n  });\n\nprogram\n  .command('health')\n  .description('Run system health check')\n  .action(async () => {\n    const cli = new DeboCLI();\n    await cli.runHealthCheck();\n  });\n\nprogram\n  .command('status')\n  .description('Show system status')\n  .action(async () => {\n    const cli = new DeboCLI();\n    await cli.showStatus();\n  });\n\n// Terminal command for interactive MCP client\nprogram\n  .command('terminal')\n  .alias('term')\n  .description('Launch interactive terminal MCP client (like Claude Code)')\n  .action(async () => {\n    const { TerminalMCPClient } = await import('../src/terminal-mcp-client.js');\n    const client = new TerminalMCPClient();\n    await client.start();\n  });\n\nprogram\n  .command('analyze [path]')\n  .description('Analyze existing codebase and create interactive project plan')\n  .action(async (projectPath) => {\n    const cli = new DeboCLI();\n    await cli.analyzeAndPlan(projectPath || process.cwd());\n  });\n\n// Default command (when no subcommand is provided)\nprogram\n  .argument('[request]', 'Development request')\n  .action(async (request) => {\n    if (!request) {\n      // No request provided, check if we're in a project directory\n      const fs = await import('fs-extra');\n      const hasProject = await fs.pathExists('package.json') || \n                        await fs.pathExists('requirements.txt') ||\n                        await fs.pathExists('.git');\n      \n      if (hasProject) {\n        // Project detected, launch terminal interface\n        const { TerminalMCPClient } = await import('../src/terminal-mcp-client.js');\n        const client = new TerminalMCPClient();\n        await client.start();\n      } else {\n        // No project, show dashboard\n        const cli = new DeboCLI();\n        await cli.runDashboard();\n      }\n    } else {\n      // Request provided, execute it\n      const cli = new DeboCLI();\n      await cli.executeRequest(request, { dashboard: true });\n    }\n  });\n\n// Parse command line arguments\nprogram.parse();\n
+#!/usr/bin/env node
+
+/**
+ * Debo CLI Entry Point
+ * 
+ * PURPOSE:
+ * Command-line interface for the Debo autonomous development system.
+ * Provides terminal-based interaction with real-time feedback.
+ * 
+ * FEATURES:
+ * - Terminal dashboard interface
+ * - Real-time command execution
+ * - Agent monitoring
+ * - Project progress tracking
+ * 
+ * TODO:
+ * - None
+ */
+
+import { program } from 'commander';
+import { TerminalInterface } from '../src/terminal-interface.js';
+import { TerminalDashboard } from '../src/terminal-dashboard.js';
+import { EnhancedTaskManager } from '../src/database/task-manager.js';
+import { execSync } from 'child_process';
+import chalk from 'chalk';
+import figlet from 'figlet';
+import ora from 'ora';
+
+class DeboCLI {
+  constructor() {
+    this.taskManager = null;
+    this.terminal = null;
+    this.dashboard = null;
+  }
+  
+  async initialize() {
+    // Check prerequisites
+    await this.checkPrerequisites();
+    
+    // Initialize task manager
+    this.taskManager = new EnhancedTaskManager();
+    await this.taskManager.connect();
+    
+    // Initialize terminal interface
+    this.terminal = new TerminalInterface(this.taskManager);
+  }
+  
+  async checkPrerequisites() {
+    const checks = [
+      {
+        name: 'Redis',
+        command: 'redis-cli ping',
+        error: 'Redis server is not running. Please start Redis first.'
+      },
+      {
+        name: 'Ollama',
+        command: 'curl -s http://localhost:11434/api/tags',
+        error: 'Ollama is not running. Please start Ollama first.'
+      }
+    ];
+    
+    for (const check of checks) {
+      const spinner = ora(`Checking ${check.name}...`).start();
+      
+      try {
+        execSync(check.command, { stdio: 'pipe' });
+        spinner.succeed(`${check.name} is running`);
+      } catch (error) {
+        spinner.fail(check.error);
+        process.exit(1);
+      }
+    }
+  }
+  
+  async runDashboard() {
+    await this.initialize();
+    
+    console.log(chalk.cyan(figlet.textSync('DEBO', { font: 'ANSI Shadow' })));
+    console.log(chalk.yellow('🚀 Starting terminal dashboard...\n'));
+    
+    this.dashboard = new TerminalDashboard(this.taskManager);
+    
+    // Start with a welcome message
+    this.dashboard.addLog('info', 'Debo autonomous development system started', 'system');
+    this.dashboard.addLog('info', 'Terminal dashboard initialized', 'system');
+    this.dashboard.addLog('info', 'Ready for development requests', 'system');
+    
+    // Render the dashboard
+    this.dashboard.render();
+    
+    return this.dashboard;
+  }
+  
+  async executeRequest(request, options = {}) {
+    await this.initialize();
+    
+    if (options.dashboard) {
+      await this.runDashboard();
+    }
+    
+    // Show request processing
+    this.terminal.addLog('info', `Processing request: ${request}`);
+    
+    // Execute the autonomous development request
+    const commandId = `request_${Date.now()}`;
+    
+    try {
+      this.terminal.startCommand(
+        commandId,
+        'Processing autonomous development request',
+        `debo: ${request}`
+      );
+      
+      // Here you would integrate with your MCP server
+      // For now, we'll simulate the process
+      
+      // Step 1: Project analysis
+      this.terminal.updateCommand(commandId, 'Analyzing project requirements...');
+      await this.simulateStep('Project analysis', 2000);
+      
+      // Step 2: Agent assignment
+      this.terminal.updateCommand(commandId, 'Assigning agents to tasks...');
+      await this.simulateStep('Agent assignment', 1500);
+      
+      // Step 3: Code generation
+      this.terminal.updateCommand(commandId, 'Generating code with AI agents...');
+      await this.simulateStep('Code generation', 3000);
+      
+      // Step 4: Testing
+      this.terminal.updateCommand(commandId, 'Running tests and validation...');
+      await this.simulateStep('Testing', 2000);
+      
+      // Step 5: Documentation
+      this.terminal.updateCommand(commandId, 'Generating documentation...');
+      await this.simulateStep('Documentation', 1000);
+      
+      this.terminal.completeCommand(commandId, true, 'Request completed successfully');
+      
+      this.terminal.showSuccess(
+        `Request "${request}" completed successfully!\n` +
+        'Check the generated files and documentation.'
+      );
+      
+    } catch (error) {
+      this.terminal.completeCommand(commandId, false, error.message);
+      this.terminal.showErrorDetails(error, `Request: ${request}`);
+    }
+  }
+  
+  async simulateStep(stepName, duration) {
+    this.terminal.addLog('info', `Starting ${stepName}...`);
+    
+    return new Promise(resolve => {
+      setTimeout(() => {
+        this.terminal.addLog('success', `${stepName} completed`);
+        resolve();
+      }, duration);
+    });
+  }
+  
+  async runHealthCheck() {
+    await this.initialize();
+    
+    console.log(chalk.cyan('🔍 Debo Health Check'));
+    console.log(chalk.gray('━'.repeat(50)));
+    
+    // Check all systems
+    const healthChecks = [
+      'Redis connection',
+      'Ollama LLM service',
+      'Agent queue system',
+      'Documentation system',
+      'Git integration',
+      'Feedback system'
+    ];
+    
+    for (const check of healthChecks) {
+      const spinner = ora(`Checking ${check}...`).start();
+      
+      // Simulate health check
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      spinner.succeed(`${check} is healthy`);
+    }
+    
+    console.log(chalk.green('\n✅ All systems operational!'));
+    console.log(chalk.gray('Debo is ready for autonomous development.'));
+  }
+  
+  async showStatus() {
+    await this.initialize();
+    
+    const stats = await this.taskManager.agentQueue.getQueueStats();
+    
+    console.log(chalk.cyan('📊 Debo System Status'));
+    console.log(chalk.gray('━'.repeat(50)));
+    console.log(chalk.yellow(`Active Agents: ${stats.activeAgents || 0}`));
+    console.log(chalk.blue(`Queued Tasks: ${stats.queuedTasks || 0}`));
+    console.log(chalk.green(`Completed Tasks: ${stats.completedTasks || 0}`));
+    console.log(chalk.magenta(`System Uptime: ${process.uptime().toFixed(0)}s`));
+    console.log(chalk.gray(`Memory Usage: ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(1)}MB`));
+  }
+  
+  async analyzeAndPlan(projectPath) {
+    await this.initialize();
+    
+    console.log(chalk.cyan('🔍 Starting comprehensive codebase analysis...'));
+    
+    try {
+      const { ProjectPlanner } = await import('../src/codebase/project-planner.js');
+      const planner = new ProjectPlanner(this.taskManager, this.terminal);
+      
+      const projectPlan = await planner.analyzeAndPlan(projectPath);
+      
+      console.log(chalk.green('\n🎉 Project analysis and planning completed!'));
+      console.log(chalk.cyan('📋 You can now monitor progress with "debo dashboard"'));
+      
+      return projectPlan;
+      
+    } catch (error) {
+      console.error(chalk.red(`Analysis failed: ${error.message}`));
+      throw error;
+    }
+  }
+}
+
+// Setup CLI commands
+program
+  .name('debo')
+  .description('Debo - Autonomous Development System')
+  .version('2.0.0');
+
+program
+  .command('dashboard')
+  .alias('dash')
+  .description('Launch the terminal dashboard interface')
+  .action(async () => {
+    const cli = new DeboCLI();
+    await cli.runDashboard();
+  });
+
+program
+  .command('build <request>')
+  .description('Execute an autonomous development request')
+  .option('-d, --dashboard', 'Show dashboard during execution')
+  .action(async (request, options) => {
+    const cli = new DeboCLI();
+    await cli.executeRequest(request, options);
+  });
+
+program
+  .command('health')
+  .description('Run system health check')
+  .action(async () => {
+    const cli = new DeboCLI();
+    await cli.runHealthCheck();
+  });
+
+program
+  .command('status')
+  .description('Show system status')
+  .action(async () => {
+    const cli = new DeboCLI();
+    await cli.showStatus();
+  });
+
+// Terminal command for interactive MCP client
+program
+  .command('terminal')
+  .alias('term')
+  .description('Launch interactive terminal MCP client (like Claude Code)')
+  .action(async () => {
+    const { TerminalMCPClient } = await import('../src/terminal-mcp-client.js');
+    const client = new TerminalMCPClient();
+    await client.start();
+  });
+
+program
+  .command('analyze [path]')
+  .description('Analyze existing codebase and create interactive project plan')
+  .action(async (projectPath) => {
+    const cli = new DeboCLI();
+    await cli.analyzeAndPlan(projectPath || process.cwd());
+  });
+
+// Default command (when no subcommand is provided)
+program
+  .argument('[request]', 'Development request')
+  .action(async (request) => {
+    if (!request) {
+      // No request provided, check if we're in a project directory
+      const fs = await import('fs-extra');
+      const hasProject = await fs.pathExists('package.json') || 
+                        await fs.pathExists('requirements.txt') ||
+                        await fs.pathExists('.git');
+      
+      if (hasProject) {
+        // Project detected, launch terminal interface
+        const { TerminalMCPClient } = await import('../src/terminal-mcp-client.js');
+        const client = new TerminalMCPClient();
+        await client.start();
+      } else {
+        // No project, show dashboard
+        const cli = new DeboCLI();
+        await cli.runDashboard();
+      }
+    } else {
+      // Request provided, execute it
+      const cli = new DeboCLI();
+      await cli.executeRequest(request, { dashboard: true });
+    }
+  });
+
+// Parse command line arguments
+program.parse();

@@ -120,6 +120,16 @@ export const agentConfig = {
       outputs: ['ui_mockups', 'design_system', 'user_flows']
     },
     instructions: 'Create intuitive user interfaces. Conduct usability testing. Maintain design consistency.'
+  },
+
+  dependency_analyst: {
+    llmType: 'thinking',
+    deliverables: {
+      code: ['documentation_index', 'compatibility_matrix'],
+      database: ['dependency_documentation', 'compatibility_checks', 'deprecation_warnings'],
+      outputs: ['approval_decision', 'migration_plan', 'best_practices_guide']
+    },
+    instructions: 'Review dependencies for compatibility, security, deprecation. Index documentation. Reject incompatible packages and provide alternatives.'
   }
 };
 
@@ -135,15 +145,5 @@ export const databasePatterns = {
     update_frequency: 'task_completion',
     data_types: ['work_artifacts', 'test_results', 'deployment_status'],
     trigger_events: ['task_complete', 'code_commit', 'deployment_success']
-  }
-};
-  dependency_analyst: {
-    llmType: 'thinking',
-    deliverables: {
-      code: ['documentation_index', 'compatibility_matrix'],
-      database: ['dependency_documentation', 'compatibility_checks', 'deprecation_warnings'],
-      outputs: ['approval_decision', 'migration_plan', 'best_practices_guide']
-    },
-    instructions: 'Review dependencies for compatibility, security, deprecation. Index documentation. Reject incompatible packages and provide alternatives.'
   }
 };
