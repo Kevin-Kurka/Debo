@@ -1,8 +1,8 @@
 {
   "name": "debo",
-  "version": "2.0.0",
+  "version": "1.0.0",
   "type": "module",
-  "description": "Debo - Autonomous Development System with Fortune 500 Agent Structure",
+  "description": "Debo - Enterprise AI System with 54 Business Agents",
   "main": "src/mcp_server.js",
   "bin": {
     "debo": "./bin/debo.js"
@@ -16,9 +16,12 @@
     "test:coverage": "jest --coverage",
     "test:unit": "jest tests/unit",
     "test:integration": "node test-system.js",
+    "test:truth": "node test-truth-finding.js",
+    "test:ui": "node src/terminal-feedback-demo.js",
     "clean": "node scripts/cleanup.js",
     "health": "node scripts/health-check.js",
-    "install-deps": "./install.sh"
+    "install-deps": "./install.sh",
+    "demo": "node demo-debo.js"
   },
   "dependencies": {
     "@langchain/community": "^0.3.45",
@@ -58,7 +61,7 @@
     "programming",
     "fortune500"
   ],
-  "author": "Kevin Kurka",
+  "author": "Your Name",
   "license": "MIT",
   "repository": {
     "type": "git",

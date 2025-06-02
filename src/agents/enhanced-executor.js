@@ -1,10 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../logger.js';
 import AgentDatabaseIntegration from './agent-database-integration.js';
-import { ConfidenceEvaluator } from '../quality/confidence-evaluator.js';
-import { ErrorTrackingManager } from '../database/error-tracking-manager.js';
-import { CodeCommentingManager } from '../tools/code-commenting-manager.js';
-import { TerminalFeedbackPresenter } from '../terminal/feedback-presenter.js';
 
 /**
  * Enhanced Agent Executor
@@ -24,16 +20,16 @@ import { TerminalFeedbackPresenter } from '../terminal/feedback-presenter.js';
  * - None
  */
 export class EnhancedAgentExecutor {
-  constructor(taskManager, llmProvider) {
+  constructor(taskManager) {
     this.taskManager = taskManager;
-    this.llmProvider = llmProvider;
     this.dbIntegration = new AgentDatabaseIntegration(taskManager);
-    this.confidenceEvaluator = new ConfidenceEvaluator(llmProvider, taskManager);
-    this.errorTracker = new ErrorTrackingManager(taskManager);
-    this.codeCommenter = new CodeCommentingManager(llmProvider);
-    this.feedbackPresenter = new TerminalFeedbackPresenter();
     this.redis = taskManager.redis;
     this.activeExecutions = new Map();
+  }
+
+  async init() {
+    // Initialize database integration if needed
+    logger.info('Enhanced Agent Executor initialized');
   }
 
   async executeAgent(agentId, task) {
@@ -47,6 +43,18 @@ export class EnhancedAgentExecutor {
       status: 'running'
     });
 
+    // Report agent starting
+    this.taskManager.reportAgentActivity(agentId, {
+      role: task.requiredRole,
+      task: task.title || task.id,
+      objective: task.description || 'Processing task',
+      progress: 0,
+      status: 'starting',
+      message: `Starting execution of task ${task.id}`,
+      dataAvailable: [],
+      nextSteps: ['Validating prerequisites', 'Loading context']
+    });
+
     try {
       // 1. Validate agent role and capabilities
       const agentRole = task.requiredRole;
@@ -55,12 +63,42 @@ export class EnhancedAgentExecutor {
       }
 
       // 2. Pre-execution validation
+      this.taskManager.reportAgentActivity(agentId, {
+        role: agentRole,
+        task: task.title || task.id,
+        objective: task.description,
+        progress: 10,
+        status: 'validating',
+        message: 'Validating prerequisites and dependencies',
+        dataAvailable: await this.getAvailableData(agentRole, task),
+        nextSteps: ['Execute task logic', 'Generate deliverables']
+      });
       await this.preExecutionValidation(agentId, agentRole, task);
 
-      // 3. Execute agent with confidence evaluation and error tracking
-      const result = await this.executeWithConfidenceAndErrorTracking(agentId, agentRole, task);
+      // 3. Execute agent with full database integration
+      this.taskManager.reportAgentActivity(agentId, {
+        role: agentRole,
+        task: task.title || task.id,
+        objective: task.description,
+        progress: 30,
+        status: 'executing',
+        message: 'Executing main task logic',
+        dataAvailable: await this.getAvailableData(agentRole, task),
+        nextSteps: ['Process results', 'Store deliverables']
+      });
+      const result = await this.dbIntegration.executeAgentTask(agentId, agentRole, task);
 
-      // 4. Post-execution processing with terminal feedback
+      // 4. Post-execution processing
+      this.taskManager.reportAgentActivity(agentId, {
+        role: agentRole,
+        task: task.title || task.id,
+        objective: task.description,
+        progress: 90,
+        status: 'finalizing',
+        message: 'Processing results and updating project state',
+        dataAvailable: Object.keys(result.deliverables || {}),
+        nextSteps: ['Complete task', 'Trigger dependencies']
+      });
       await this.postExecutionProcessing(executionId, agentId, task, result);
 
       // 5. Update execution tracking
@@ -69,6 +107,18 @@ export class EnhancedAgentExecutor {
         status: 'completed',
         success: result.success,
         endTime: Date.now()
+      });
+
+      // Report completion
+      this.taskManager.reportAgentActivity(agentId, {
+        role: agentRole,
+        task: task.title || task.id,
+        objective: task.description,
+        progress: 100,
+        status: 'completed',
+        message: `Task completed successfully with ${result.confidence}% confidence`,
+        dataAvailable: Object.keys(result.deliverables || {}),
+        nextSteps: []
       });
 
       logger.info(`Agent execution completed successfully: ${agentId}`);
@@ -151,324 +201,6 @@ export class EnhancedAgentExecutor {
     if (missingPrereqs.length > 0) {
       throw new Error(`Missing prerequisites for ${agentRole}: ${missingPrereqs.join(', ')}`);
     }
-  }
-
-  async executeWithConfidenceAndErrorTracking(agentId, agentRole, task) {
-    let attempt = 0;
-    const maxAttempts = 3;
-    
-    while (attempt < maxAttempts) {
-      attempt++;
-      logger.info(`Executing ${agentRole} task (attempt ${attempt}/${maxAttempts})`);
-
-      try {
-        // Initial execution with database integration
-        const initialResult = await this.dbIntegration.executeAgentTask(agentId, agentRole, task);
-        
-        // For coding tasks, evaluate confidence
-        if (this.isCodingTask(agentRole, task)) {
-          const confidenceResult = await this.evaluateCodeConfidence(task, initialResult);
-          
-          // Show confidence evaluation in terminal
-          await this.feedbackPresenter.showConfidenceEvaluation(task.id, confidenceResult.evaluation);
-          
-          if (!confidenceResult.approved) {
-            // Handle low confidence with feedback loop
-            const feedbackResult = await this.handleLowConfidence(task, initialResult, confidenceResult);
-            
-            if (feedbackResult.shouldRetry && attempt < maxAttempts) {
-              // Show feedback loop activation
-              await this.feedbackPresenter.showFeedbackLoop(feedbackResult.feedback);
-              
-              // Update task with improvement suggestions
-              task.improvementSuggestions = feedbackResult.feedback.suggestions;
-              continue; // Retry with improvements
-            } else if (feedbackResult.shouldEscalate) {
-              return await this.escalateToThinkingAgent(task, confidenceResult);
-            }
-          }
-          
-          // Add code comments and documentation
-          if (initialResult.filesCreated || initialResult.filesModified) {
-            const commentedResult = await this.addCodeDocumentation(initialResult, task);
-            
-            // Show file creation feedback in terminal
-            for (const file of commentedResult.documentedFiles || []) {
-              await this.feedbackPresenter.showFileCreation(
-                file.path, 
-                file.commentingResult, 
-                confidenceResult.evaluation.confidencePercentage
-              );
-            }
-            
-            return commentedResult;
-          }
-        }
-        
-        return initialResult;
-        
-      } catch (error) {
-        // Track error with solution history
-        const errorId = await this.errorTracker.trackError(error, {
-          projectId: task.projectId,
-          taskId: task.id,
-          agentType: agentRole,
-          attempt
-        });
-        
-        if (attempt < maxAttempts) {
-          // Propose solution and check for duplicates/circular patterns
-          const solutionProposal = await this.proposeSolution(errorId, error, agentRole, task, attempt);
-          
-          // Show error tracking in terminal
-          await this.feedbackPresenter.showErrorTracking(errorId, {
-            errorType: this.errorTracker.categorizeError(error),
-            severity: this.errorTracker.assessErrorSeverity(error, { agentType: agentRole }),
-            errorMessage: error.message,
-            occurrenceCount: 1
-          }, solutionProposal);
-          
-          if (!solutionProposal.allowed) {
-            if (solutionProposal.reason === 'circular_pattern' || 
-                solutionProposal.reason === 'max_attempts_reached') {
-              // Escalate to architect for comprehensive solution
-              return await this.escalateToArchitect(task, error, solutionProposal);
-            }
-            
-            // Try alternative approach if available
-            if (solutionProposal.recommendation && solutionProposal.recommendation.action === 'try_alternative_approach') {
-              task.alternativeApproach = solutionProposal.recommendation;
-              continue;
-            }
-          }
-          
-          // Log solution attempt
-          await this.errorTracker.recordSolutionResult(solutionProposal.solutionId, 'attempted', {
-            attempt,
-            agentType: agentRole,
-            taskId: task.id
-          });
-          
-          // Brief pause before retry
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-        } else {
-          // Max attempts reached - record failure and escalate
-          await this.errorTracker.recordSolutionResult(errorId, 'failure', {
-            finalAttempt: true,
-            escalated: true
-          });
-          
-          throw new Error(`Task failed after ${maxAttempts} attempts: ${error.message}`);
-        }
-      }
-    }
-  }
-
-  isCodingTask(agentRole, task) {
-    const codingRoles = ['backend_developer', 'frontend_developer', 'solution_architect'];
-    const codingActions = ['implement', 'code', 'develop', 'create', 'build', 'fix'];
-    
-    return codingRoles.includes(agentRole) || 
-           codingActions.some(action => task.action?.toLowerCase().includes(action));
-  }
-
-  async evaluateCodeConfidence(task, result) {
-    let evaluationType = 'code_generation';
-    
-    // Determine evaluation type based on task
-    if (task.action?.toLowerCase().includes('fix') || task.action?.toLowerCase().includes('bug')) {
-      evaluationType = 'bug_fix';
-    } else if (task.action?.toLowerCase().includes('architecture') || task.action?.toLowerCase().includes('design')) {
-      evaluationType = 'architecture';
-    } else if (task.action?.toLowerCase().includes('feature') || task.action?.toLowerCase().includes('implement')) {
-      evaluationType = 'feature_implementation';
-    }
-    
-    // Evaluate confidence based on task type
-    const evaluation = await this.confidenceEvaluator.evaluateTaskConfidence({
-      id: task.id,
-      type: evaluationType,
-      description: task.description || task.action,
-      requirements: task.requirements || {}
-    }, result);
-    
-    // Create feedback for confidence evaluation
-    const feedback = await this.confidenceEvaluator.createConfidenceFeedbackLoop(task, evaluation);
-    
-    return {
-      evaluation,
-      approved: feedback.approved,
-      feedback
-    };
-  }
-
-  async handleLowConfidence(task, result, confidenceResult) {
-    const confidence = confidenceResult.evaluation.confidencePercentage;
-    
-    if (confidence < 50) {
-      // Very low confidence - escalate to thinking agent
-      return {
-        shouldEscalate: true,
-        shouldRetry: false,
-        feedback: confidenceResult.feedback
-      };
-    } else if (confidence < 90) {
-      // Low confidence - try to improve with feedback
-      return {
-        shouldRetry: true,
-        shouldEscalate: false,
-        feedback: confidenceResult.feedback
-      };
-    }
-    
-    return {
-      shouldRetry: false,
-      shouldEscalate: false,
-      feedback: confidenceResult.feedback
-    };
-  }
-
-  async addCodeDocumentation(result, task) {
-    const documentedFiles = [];
-    
-    // Add documentation to created files
-    if (result.filesCreated) {
-      for (const file of result.filesCreated) {
-        if (file.content) {
-          const commentingResult = await this.codeCommenter.addHeaderToFile(
-            file.path,
-            file.content,
-            {
-              taskId: task.id,
-              projectId: task.projectId,
-              agentType: task.agentType,
-              purpose: task.description
-            }
-          );
-          
-          // Update file content with documentation
-          file.content = commentingResult.content;
-          
-          documentedFiles.push({
-            path: file.path,
-            commentingResult
-          });
-        }
-      }
-    }
-    
-    // Add documentation to modified files
-    if (result.filesModified) {
-      for (const file of result.filesModified) {
-        if (file.newContent) {
-          const commentingResult = await this.codeCommenter.updateExistingHeader(
-            file.path,
-            file.newContent,
-            {
-              taskId: task.id,
-              projectId: task.projectId,
-              modification: file.changes
-            }
-          );
-          
-          file.newContent = commentingResult.content;
-          
-          documentedFiles.push({
-            path: file.path,
-            commentingResult
-          });
-        }
-      }
-    }
-    
-    return {
-      ...result,
-      documentedFiles
-    };
-  }
-
-  async proposeSolution(errorId, error, agentRole, task, attempt) {
-    const solution = {
-      type: 'error_fix',
-      description: `Attempt ${attempt} to fix ${error.constructor.name}: ${error.message}`,
-      code: '', // Would contain the actual fix code
-      approach: this.determineSolutionApproach(error, agentRole, task)
-    };
-    
-    // Check with error tracker for duplicate/circular solutions
-    const proposal = await this.errorTracker.proposeSolution(
-      errorId,
-      solution,
-      agentRole,
-      75 // Base confidence for error fixes
-    );
-    
-    return proposal;
-  }
-
-  determineSolutionApproach(error, agentRole, task) {
-    // Determine solution approach based on error type and agent role
-    const errorMessage = error.message.toLowerCase();
-    
-    if (errorMessage.includes('syntax')) return 'syntax_correction';
-    if (errorMessage.includes('undefined') || errorMessage.includes('reference')) return 'variable_definition';
-    if (errorMessage.includes('permission') || errorMessage.includes('access')) return 'permission_fix';
-    if (errorMessage.includes('network') || errorMessage.includes('timeout')) return 'network_retry';
-    if (errorMessage.includes('validation')) return 'input_validation';
-    
-    return 'general_fix';
-  }
-
-  async escalateToThinkingAgent(task, confidenceResult) {
-    logger.info(`Escalating task ${task.id} to thinking agent due to low confidence`);
-    
-    // Create escalation task for CTO or Solution Architect
-    const escalationTask = {
-      id: `escalation_${task.id}_${Date.now()}`,
-      type: 'confidence_escalation',
-      originalTask: task,
-      confidenceIssues: confidenceResult.evaluation,
-      priority: 'high',
-      assignedTo: confidenceResult.evaluation.confidencePercentage < 50 ? 'cto' : 'solution_architect',
-      createdAt: new Date().toISOString()
-    };
-    
-    await this.taskManager.redis.hSet(`escalation:${escalationTask.id}`, escalationTask);
-    await this.taskManager.redis.lPush('escalation_queue', escalationTask.id);
-    
-    return {
-      success: false,
-      escalated: true,
-      escalationId: escalationTask.id,
-      reason: 'low_confidence',
-      originalResult: null
-    };
-  }
-
-  async escalateToArchitect(task, error, solutionProposal) {
-    logger.warn(`Escalating task ${task.id} to architect due to circular/repeated errors`);
-    
-    const escalationTask = {
-      id: `arch_escalation_${task.id}_${Date.now()}`,
-      type: 'error_escalation',
-      originalTask: task,
-      errorHistory: solutionProposal,
-      priority: 'high',
-      assignedTo: 'solution_architect',
-      reason: solutionProposal.reason,
-      createdAt: new Date().toISOString()
-    };
-    
-    await this.taskManager.redis.hSet(`escalation:${escalationTask.id}`, escalationTask);
-    await this.taskManager.redis.lPush('architect_escalation_queue', escalationTask.id);
-    
-    return {
-      success: false,
-      escalated: true,
-      escalationId: escalationTask.id,
-      reason: 'circular_errors',
-      requiresArchitecturalReview: true
-    };
   }
 
   async postExecutionProcessing(executionId, agentId, task, result) {
@@ -862,6 +594,79 @@ export class EnhancedAgentExecutor {
 
   async getDatabaseUtilizationReport(projectId) {
     return await this.dbIntegration.getDatabaseUtilizationReport(projectId);
+  }
+
+  /**
+   * Get available data for an agent
+   */
+  async getAvailableData(agentRole, task) {
+    const available = [];
+    
+    try {
+      switch (agentRole) {
+        case 'backend_developer':
+          const apiSpecs = await this.redis.hGetAll(`architecture:${task.projectId}`);
+          if (apiSpecs && apiSpecs.apiReference) {
+            available.push('API Specifications');
+          }
+          const requirements = await this.redis.sMembers(`project:${task.projectId}:requirements`);
+          if (requirements.length > 0) {
+            available.push(`${requirements.length} Requirements`);
+          }
+          break;
+          
+        case 'frontend_developer':
+          const uiSpecs = await this.redis.hGetAll(`design:${task.projectId}`);
+          if (uiSpecs) {
+            available.push('UI Specifications');
+          }
+          const apiContracts = await this.redis.hGetAll(`api_contracts:${task.projectId}`);
+          if (apiContracts) {
+            available.push('API Contracts');
+          }
+          break;
+          
+        case 'qa_engineer':
+          const testPlans = await this.redis.sMembers(`test_plans:${task.projectId}`);
+          if (testPlans.length > 0) {
+            available.push(`${testPlans.length} Test Plans`);
+          }
+          const codeFiles = await this.redis.sMembers(`project:${task.projectId}:files`);
+          if (codeFiles.length > 0) {
+            available.push(`${codeFiles.length} Code Files`);
+          }
+          break;
+          
+        case 'devops_engineer':
+          const infraSpecs = await this.redis.hGetAll(`infrastructure:${task.projectId}`);
+          if (infraSpecs) {
+            available.push('Infrastructure Specifications');
+          }
+          const deploymentConfig = await this.redis.hGetAll(`deployment:${task.projectId}`);
+          if (deploymentConfig) {
+            available.push('Deployment Configuration');
+          }
+          break;
+          
+        default:
+          // For other roles, check general project data
+          const projectData = await this.redis.hGetAll(`project:${task.projectId}`);
+          if (projectData) {
+            available.push('Project Information');
+          }
+      }
+      
+      // Check for any previous agent deliverables
+      const deliverables = await this.redis.keys(`deliverables:${task.projectId}:*`);
+      if (deliverables.length > 0) {
+        available.push(`${deliverables.length} Previous Deliverables`);
+      }
+      
+    } catch (error) {
+      logger.warn(`Error getting available data for ${agentRole}: ${error.message}`);
+    }
+    
+    return available;
   }
 }
 

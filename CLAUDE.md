@@ -4,97 +4,90 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Debo is an autonomous development system that mimics a Fortune 500 enterprise structure. It provides a single MCP tool (`debo`) that orchestrates multiple specialized AI agents to handle complete software development lifecycles.
+Debo is an **open source AI enterprise system** with 54 specialized business agents that run entirely locally on the user's machine. All agents operate via Ollama with optional external access when explicitly configured. The system provides complete privacy with no vendor lock-in.
 
 ## Common Development Commands
 
-### Building and Running
+### Setup and Running
 ```bash
-npm install              # Install dependencies
-npm run setup           # Initial setup (starts Redis, pulls Ollama models, configures system)
-npm start               # Start the MCP server
+npm install              # Install dependencies  
+npm run setup           # Initial setup (Redis, Ollama models, system config)
+npm start               # Start MCP server (production)
 npm run dev             # Start with nodemon for development
 ```
 
 ### Testing and Quality
 ```bash
-npm test                # Run all tests with Jest
+npm test                # Run Jest tests
 npm run test:watch      # Run tests in watch mode
-npm run test:coverage   # Generate test coverage report
+npm run test:coverage   # Run tests with coverage report
 npm run test:unit       # Run unit tests only
 npm run test:integration # Run integration tests
 npm run health          # Check system health
-npm run clean           # Clean up old data
+npm run clean           # Clean up old Redis data
 ```
 
-### Using Debo in MCP Applications
+### Installation and Dependencies
 ```bash
-# Create a new project
-debo create "project-name" "Project description and requirements"
-
-# Add features to existing project
-debo develop "project-name" "Feature description"
-
-# Check project status
-debo status "project-name"
-
-# Deploy project
-debo deploy "project-name" "environment"
-
-# Perform maintenance
-debo maintain "project-name" "Maintenance tasks"
-
-# Analyze project quality
-debo analyze "project-name"
+npm run install-deps    # Run system installer (./install.sh)
+./install-oneliner.sh   # One-line system installation
 ```
 
 ## High-Level Architecture
 
-### Agent-Based System
-The system uses a Fortune 500 company structure with two types of agents:
+### Privacy-First Design
+- **Local Processing**: All 54 agents run on user's machine via Ollama
+- **Local Storage**: Redis database stores all data locally
+- **Optional External**: Agents only reach out when explicitly configured
+- **Open Source**: MIT licensed, completely transparent
 
-1. **Thinking Agents** (use larger LLMs for strategic planning):
-   - CTO: Strategic analysis and delegation
-   - Engineering Manager: Sprint planning and coordination
-   - Product Manager: Feature prioritization
-   - Business Analyst: Requirements gathering
-   - Solution Architect: System design
-   - Technical Writer: Documentation
+### Unified Services Architecture
+The system uses a consolidated service architecture (ServiceFactory pattern):
 
-2. **Fast Execution Agents** (use smaller LLMs for implementation):
-   - Backend/Frontend Developers: Code implementation
-   - QA Engineer: Testing
-   - DevOps: Deployment
-   - Security: Vulnerability scanning
-   - UX Designer: Interface design
+1. **DatabaseService**: Unified Redis operations with connection pooling
+2. **AgentExecutionEngine**: Optimized agent processing with batch operations  
+3. **LLMRequestManager**: Request batching, caching, and cost optimization
+4. **MemoryManager**: Intelligent cleanup and auto-summarization
+5. **UnifiedOrchestratorService**: Strategic orchestration with multiple patterns
 
-### Core Components
+### Agent Hierarchy (54 Agents)
+```
+CEO Agent (Strategic Analysis)
+├── C-Suite (8 Executive Agents) - Strategic thinking models
+│   ├── CFO, COO, CTO, CMO, CHRO, CLO, CRO
+└── Departments (46 Specialist Agents) - Fast execution models
+    ├── Finance (8), Engineering (11), Legal (6)
+    ├── Sales (6), Marketing (6), Operations (6), HR (6)
+```
 
-1. **MCP Server** (`src/mcp_server.js`): Main entry point implementing the Model Context Protocol
-2. **Unified Orchestrator** (`src/core/unified-orchestrator.js`): Coordinates all agent activities and task dependencies
-3. **Task Management** (`src/database/task-manager.js`): Redis-based persistent state management
-4. **Quality Gateway** (`src/core/quality-gateway.js`): Automated quality checks and metrics
-5. **Agent Executor** (`src/agents/executor.js`): Standardized agent execution and result handling
+### MCP Server Flow
+1. **Single Tool Interface**: Only `debo` tool accepts natural language
+2. **CEO Analysis**: Strategic analysis and task delegation
+3. **Parallel Execution**: Departments work simultaneously with Redis state sharing
+4. **Quality Gateway**: Automated checks for all deliverables
+5. **Result Aggregation**: Unified response with full audit trail
 
-### Task Flow
-1. Commands trigger the CTO agent for strategic analysis
-2. CTO delegates to appropriate teams based on the task
-3. Tasks are executed asynchronously with dependency tracking
-4. Quality checks run automatically for code-producing agents
-5. Dependent tasks trigger based on completion patterns
+## Key Design Patterns
 
-### Database Schema
-Uses Redis with structured keys:
-- `project:{id}`: Project metadata and status
-- `task:{id}`: Individual task details and results
-- `agent_queue:{role}`: Task queues for each agent type
-- `activity_log:{project}`: Comprehensive activity tracking
+### Service Factory Pattern
+```javascript
+// All services initialized through ServiceFactory
+const services = await ServiceFactory.createOptimizedServices();
+// Returns: database, llmRequest, memory, agentExecution, orchestrator
+```
 
-### Key Design Patterns
-- **Event-driven architecture** for asynchronous task execution
-- **Quality gateway pattern** for automated quality assurance
-- **Pipeline architecture** for structured workflows
-- **Dependency-aware scheduling** for optimal task execution
+### Agent Role Architecture
+- **fortune500-roles.js**: All 54 business agent definitions
+- **enhanced-executor.js**: Unified agent execution with Redis integration
+- **department-manager.js**: Cross-department coordination
+
+### Redis Schema
+```
+project:{id}              # Project metadata and status
+task:{id}                 # Task details and results  
+agent:{id}:state         # Agent execution contexts
+workflow:{id}            # Business workflow data
+```
 
 ## Development Guidelines
 
@@ -103,6 +96,18 @@ Uses Redis with structured keys:
 - **Ollama**: Required for local AI models (auto-installed via `npm run setup`)
 - **Node.js 18+**: Required for ES modules and modern features
 
+### Working with Services
+- Use ServiceFactory for service initialization
+- All services support graceful shutdown and health checks
+- Services auto-initialize dependencies in correct order
+- Shared utilities available in `src/utils/shared-utilities.js`
+
+### Adding New Agents
+1. Define role in `src/agents/fortune500-roles.js` or create new role file
+2. Use EnhancedExecutor for Redis integration
+3. Follow department structure (thinking vs execution agents)
+4. Ensure deliverables follow quality gateway patterns
+
 ### When Adding New Features
 1. Consider which agent(s) should handle the work
 2. Update the orchestrator if new workflows are needed
@@ -110,19 +115,17 @@ Uses Redis with structured keys:
 4. Add appropriate logging for monitoring
 5. Write tests following the Jest configuration in `jest.config.js`
 
-### When Modifying Agents
-1. Maintain the separation between thinking and fast agents
-2. Follow the existing prompt structure in `src/agents/roles.js`
-3. Ensure deliverables are properly stored in the database
-4. Update agent capabilities in the orchestrator
-5. Test with both unit and integration tests
+### Local-First Development
+- Default configuration uses local Ollama models
+- External APIs require explicit environment variable configuration
+- All processing happens locally unless user specifically requests external access
+- Test with `npm run health` to verify local-only operation
 
-### Working with Redis
-- All project state is stored in Redis for persistence
-- Use the TaskManager class for database operations
-- Follow existing key naming conventions
-- Clean up old data periodically with `npm run clean`
-- Redis connection includes automatic retry logic
+### Performance Optimization
+- Services are pre-optimized with batching and caching
+- Use `logger.js` with createLogger for named loggers
+- Monitor performance through built-in metrics in services
+- Agent state automatically persists to Redis
 
 ### Testing Guidelines
 - Tests use ES modules (`.js` files with `type: "module"`)
@@ -142,3 +145,38 @@ Uses Redis with structured keys:
 - Main server entry point: `src/mcp_server.js`
 - Tools are managed through `src/tools/manager.js`
 - Custom MCP tools can be added via the tool registry
+
+## Environment Variables
+
+Required for local operation:
+```bash
+REDIS_URL=redis://localhost:6379
+OLLAMA_BASE_URL=http://localhost:11434
+```
+
+Optional for external access:
+```bash
+# Only set these if you want external capabilities
+OPENAI_API_KEY=your_key_here
+ANTHROPIC_API_KEY=your_key_here
+```
+
+## Important Implementation Notes
+
+1. **Open Source Focus**: MIT licensed, no proprietary dependencies
+2. **Privacy First**: No external calls without explicit user configuration
+3. **Single Tool Design**: Only `debo` command - no separate dialogue/query tools
+4. **Unified Architecture**: One optimized service layer, no legacy code
+5. **Local LLMs**: Primary operation through Ollama models
+6. **Agent Collaboration**: Full Redis state sharing between all 54 agents
+7. **Quality Gateway**: Automated validation for all agent outputs
+
+## Agent Communication Flow
+
+Agents communicate through Redis with these key patterns:
+- **Task Delegation**: CEO → C-Suite → Departments
+- **State Sharing**: All agents read/write shared project state
+- **Deliverable Storage**: Structured outputs stored with metadata
+- **Workflow Coordination**: Department managers orchestrate team efforts
+
+The system is designed for complete local operation with the flexibility to reach out for external information only when the user explicitly requests it.

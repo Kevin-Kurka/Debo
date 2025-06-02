@@ -3,15 +3,16 @@ echo "Restarting DBot..."
 
 # Kill existing processes
 pkill -f "node.*mcp_server" 2>/dev/null
-# No menubar to kill
+pkill -f "menubar" 2>/dev/null
 
 # Wait for cleanup
 sleep 2
 
 # Start MCP server
-cd $HOME/debo
+cd /Users/kmk/dbot
 node src/mcp_server.js &
 
-# Terminal-only interface - no menubar
+# Start menubar
+npm run menubar &
 
 echo "DBot restarted"

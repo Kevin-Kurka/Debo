@@ -1,128 +1,176 @@
 #!/bin/bash
 
-# Debo One-Line Installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/Kevin-Kurka/Debo/main/install-oneliner.sh | bash
+# Debo One-Liner Installer
+# Professional, clean, with real-time feedback
 
-set -e
+set -euo pipefail
 
-# Colors for output
+# Configuration
+REPO_URL="https://github.com/Kevin-Kurka/Debo.git"
+INSTALL_DIR="${DEBO_INSTALL_DIR:-$HOME/debo}"
+
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+CYAN='\033[0;36m'
+NC='\033[0m'
+BOLD='\033[1m'
+DIM='\033[2m'
 
-# Detect OS
-OS="$(uname -s)"
-ARCH="$(uname -m)"
-
-echo -e "${BLUE}🤖 Debo Installer${NC}"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-# Check prerequisites
-check_command() {
-    if ! command -v $1 &> /dev/null; then
-        echo -e "${RED}❌ $1 is not installed${NC}"
-        return 1
-    else
-        echo -e "${GREEN}✅ $1 found${NC}"
-        return 0
-    fi
+# Progress bar
+show_progress() {
+    local current=$1
+    local total=$2
+    local message=$3
+    local width=50
+    local percentage=$((current * 100 / total))
+    local filled=$((current * width / total))
+    local empty=$((width - filled))
+    
+    printf "\r[%*s%*s] %d%% %s" $filled '█' $empty '░' $percentage "$message"
 }
 
-echo -e "\n${YELLOW}Checking prerequisites...${NC}"
+# Clear status line
+clear_line() {
+    printf "\r%-80s\r" " "
+}
 
-# Check Node.js
-if ! check_command node; then
-    echo -e "${YELLOW}Installing Node.js...${NC}"
-    if [[ "$OS" == "Darwin" ]]; then
-        if check_command brew; then
-            brew install node
-        else
-            echo -e "${RED}Please install Homebrew first: https://brew.sh${NC}"
-            exit 1
-        fi
-    elif [[ "$OS" == "Linux" ]]; then
-        curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
-        sudo apt-get install -y nodejs
-    fi
-fi
+# Print status
+status() {
+    clear_line
+    echo "$1"
+}
 
-# Check Git
-if ! check_command git; then
-    echo -e "${RED}Please install Git first${NC}"
+# Show banner
+clear
+echo -e "${CYAN}${BOLD}"
+cat << 'EOF'
+
+    ██████╗ ███████╗██████╗  ██████╗ 
+    ██╔══██╗██╔════╝██╔══██╗██╔═══██╗
+    ██║  ██║█████╗  ██████╔╝██║   ██║
+    ██║  ██║██╔══╝  ██╔══██╗██║   ██║
+    ██████╔╝███████╗██████╔╝╚██████╔╝
+    ╚═════╝ ╚══════╝╚═════╝  ╚═════╝ 
+
+    Open Source AI Enterprise System v1.0.0
+
+EOF
+echo -e "${NC}"
+
+echo "Installing local AI workforce with 54 business agents..."
+echo "────────────────────────────────────────────────────────"
+echo ""
+
+# System check
+echo "System Analysis"
+echo ""
+
+# Quick prerequisite check
+echo -n "Checking system requirements"
+MISSING=()
+
+printf "."
+command -v git &>/dev/null || MISSING+=("git")
+
+printf "."
+command -v curl &>/dev/null || command -v wget &>/dev/null || MISSING+=("curl/wget")
+
+printf "."
+command -v node &>/dev/null || echo " (Node.js will be installed)"
+
+echo " OK"
+
+if [ ${#MISSING[@]} -gt 0 ]; then
+    status "${RED}Error: Missing required tools: ${MISSING[*]}${NC}"
+    echo ""
+    echo "Please install missing tools and try again."
     exit 1
 fi
 
-# Install Redis
-if ! check_command redis-cli; then
-    echo -e "${YELLOW}Installing Redis...${NC}"
-    if [[ "$OS" == "Darwin" ]]; then
-        brew install redis
-        brew services start redis
-    elif [[ "$OS" == "Linux" ]]; then
-        sudo apt update
-        sudo apt install -y redis-server
-        sudo systemctl start redis
-    fi
-fi
+status "System requirements verified"
 
-# Install Ollama
-if ! check_command ollama; then
-    echo -e "${YELLOW}Installing Ollama...${NC}"
-    curl -fsSL https://ollama.ai/install.sh | sh
-fi
-
-# Clone and setup Debo
-echo -e "\n${YELLOW}Installing Debo...${NC}"
-
-# Create installation directory
-INSTALL_DIR="$HOME/.debo"
-if [ -d "$INSTALL_DIR" ]; then
-    echo -e "${YELLOW}Removing existing installation...${NC}"
+# Check for existing installation
+if [[ -d "$INSTALL_DIR" ]]; then
+    echo ""
+    echo "Existing Installation Found"
+    echo ""
+    status "Removing previous installation at $INSTALL_DIR..."
     rm -rf "$INSTALL_DIR"
+    status "Previous installation removed"
 fi
 
-# Clone repository
-git clone https://github.com/Kevin-Kurka/Debo.git "$INSTALL_DIR"
-cd "$INSTALL_DIR"
+# Download repository
+echo ""
+echo "Downloading Debo Repository"
+echo ""
 
-# Install dependencies
-echo -e "${YELLOW}Installing dependencies...${NC}"
-npm install --silent
+status "Connecting to GitHub..."
 
-# Create .env file
-cat > .env << EOF
-# Auto-generated by Debo installer
-REDIS_URL=redis://localhost:6379
-LLM_PROVIDER=ollama
-OLLAMA_BASE_URL=http://localhost:11434
-WEBSOCKET_PORT=3001
-NODE_ENV=production
-LOG_LEVEL=info
-EOF
+# Clone with real progress
+git clone --progress "$REPO_URL" "$INSTALL_DIR" 2>&1 | {
+    while IFS= read -r line; do
+        if [[ "$line" =~ Counting\ objects:\ ([0-9]+) ]]; then
+            status "Counting repository objects..."
+        elif [[ "$line" =~ Receiving\ objects:\ +([0-9]+)%.*\(([0-9]+)/([0-9]+)\) ]]; then
+            percent="${BASH_REMATCH[1]}"
+            current="${BASH_REMATCH[2]}"
+            total="${BASH_REMATCH[3]}"
+            show_progress "$current" "$total" "Downloading files"
+        elif [[ "$line" =~ Resolving\ deltas:\ +([0-9]+)%.*\(([0-9]+)/([0-9]+)\) ]]; then
+            percent="${BASH_REMATCH[1]}"
+            current="${BASH_REMATCH[2]}"
+            total="${BASH_REMATCH[3]}"
+            show_progress "$current" "$total" "Processing repository"
+        elif [[ "$line" =~ "Cloning into" ]]; then
+            status "Initializing repository..."
+        fi
+    done
+    echo ""
+}
 
-# Pull Ollama models
-echo -e "\n${YELLOW}Downloading AI models (this may take a while)...${NC}"
-ollama pull llama2:13b
-ollama pull codellama:7b
-ollama pull mistral:7b
+if [ ! -d "$INSTALL_DIR" ]; then
+    status "${RED}Error: Failed to download repository${NC}"
+    exit 1
+fi
 
-# Create global command
-echo -e "\n${YELLOW}Setting up global command...${NC}"
-sudo npm link
+status "Repository downloaded successfully"
 
-# Run setup
-echo -e "\n${YELLOW}Running initial setup...${NC}"
-npm run setup
+# Change to install directory
+cd "$INSTALL_DIR" || exit 1
 
-# Create directories
-mkdir -p "$HOME/debo-projects"
+# Setup
+echo ""
+echo "Initial Setup"
+echo ""
 
-echo -e "\n${GREEN}✨ Debo installation complete!${NC}"
-echo -e "\n${BLUE}Quick Start:${NC}"
-echo "  debo create my-app \"Build a todo app with React\""
-echo "  debo monitor my-app"
-echo "  debo deploy my-app production"
-echo -e "\n${BLUE}Web Monitor:${NC} http://localhost:3001"
-echo -e "${BLUE}Documentation:${NC} https://github.com/Kevin-Kurka/Debo"
+# Make scripts executable
+chmod +x install.sh scripts/*.sh scripts/*.js 2>/dev/null || true
+status "Scripts configured"
+
+# Verify structure
+if [[ ! -f "package.json" ]]; then
+    status "${RED}Error: Invalid repository structure${NC}"
+    exit 1
+fi
+
+status "Repository structure verified"
+
+# Launch main installer
+echo ""
+echo "Launching Full Installation"
+echo ""
+echo "The installer will:"
+echo "  • Install Node.js and npm (if needed)"
+echo "  • Set up Redis database"
+echo "  • Install Ollama AI platform"
+echo "  • Download AI models in background"
+echo "  • Configure 54 business agents"
+echo ""
+echo "${DIM}Installation typically takes 5-10 minutes${NC}"
+echo ""
+
+# Execute main installer
+exec ./install.sh

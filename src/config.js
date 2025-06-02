@@ -12,7 +12,7 @@ export const config = {
   server: {
     port: parseInt(process.env.PORT || '3000'),
     host: process.env.HOST || 'localhost',
-    name: process.env.SERVER_NAME || 'debo',
+    name: process.env.SERVER_NAME || 'dbot',
     version: process.env.SERVER_VERSION || '1.0.0'
   },
   redis: {
@@ -24,7 +24,10 @@ export const config = {
     logs: process.env.LOG_PATH || join(__dirname, '..', 'logs'),
     models: process.env.MODELS_PATH || '/tmp/models'
   },
-  ollama: {
+  tray: {
+    updateInterval: parseInt(process.env.TRAY_UPDATE_INTERVAL || '30000'),
+    logCheckThreshold: parseInt(process.env.LOG_CHECK_THRESHOLD || '60000')
+  },  ollama: {
     models: {
       coding: process.env.OLLAMA_CODING_MODEL || 'devstral',
       reasoning: process.env.OLLAMA_REASONING_MODEL || 'deepseek-r1:1.5b',

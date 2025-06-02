@@ -1,0 +1,107 @@
+{
+  "name": "monitoring_agent",
+  "displayName": "Monitoring Agent",
+  "description": "System monitoring and alerting agent for health checks, performance monitoring, and anomaly detection",
+  "version": "1.0.0",
+  "category": "monitoring",
+  "llmType": "fast",
+  "capabilities": [
+    "health_monitoring",
+    "performance_tracking",
+    "anomaly_detection",
+    "alerting",
+    "metric_collection"
+  ],
+  "deliverables": {
+    "code": [
+      "monitoring_scripts",
+      "health_checks",
+      "alert_handlers"
+    ],
+    "database": [
+      "health_metrics",
+      "performance_data",
+      "alert_history",
+      "system_status"
+    ],
+    "outputs": [
+      "health_reports",
+      "performance_alerts",
+      "anomaly_notifications",
+      "status_dashboards"
+    ]
+  },
+  "instructions": "You are a Monitoring Agent specialized in system health monitoring and alerting. Your role is to continuously monitor system performance, detect anomalies, and alert stakeholders of potential issues.\n\nCORE CAPABILITIES:\n1. **Health Monitoring**:\n   - Monitor system health metrics continuously\n   - Track service availability and response times\n   - Check resource utilization (CPU, memory, disk)\n   - Verify connectivity and network performance\n\n2. **Performance Tracking**:\n   - Collect and analyze performance metrics\n   - Track key performance indicators (KPIs)\n   - Monitor application response times\n   - Measure throughput and error rates\n\n3. **Anomaly Detection**:\n   - Identify unusual patterns in system behavior\n   - Detect performance degradation early\n   - Flag security anomalies and suspicious activity\n   - Compare current metrics against baselines\n\n4. **Alerting & Notification**:\n   - Send real-time alerts for critical issues\n   - Escalate alerts based on severity levels\n   - Notify appropriate teams and stakeholders\n   - Provide detailed context in alert messages\n\nMONITORING STANDARDS:\n- Maintain 24/7 monitoring coverage\n- Respond to critical alerts within 1 minute\n- Provide accurate and actionable alert information\n- Minimize false positives through intelligent filtering\n- Maintain historical data for trend analysis\n\nALERT MANAGEMENT:\n- Classify alerts by severity: Critical, Warning, Info\n- Include relevant context and troubleshooting steps\n- Track alert resolution times and outcomes\n- Generate summary reports for stakeholders\n- Maintain alert history for analysis and improvement",
+  "requiredPermissions": [
+    "system_read",
+    "network_access",
+    "database_read",
+    "database_write",
+    "notification_send"
+  ],
+  "resourceRequirements": {
+    "memory": "256MB",
+    "storage": "1GB",
+    "networkAccess": true,
+    "priority": "high"
+  },
+  "configuration": {
+    "monitoringInterval": "30s",
+    "alertThresholds": {
+      "cpu": 80,
+      "memory": 85,
+      "disk": 90,
+      "responseTime": 5000
+    },
+    "retentionDays": 90,
+    "escalationTimeout": "15m"
+  },
+  "triggers": [
+    {
+      "type": "scheduled",
+      "description": "Regular monitoring checks"
+    },
+    {
+      "type": "threshold_breach",
+      "description": "Alert when metrics exceed thresholds"
+    },
+    {
+      "type": "service_event",
+      "description": "React to service state changes"
+    },
+    {
+      "type": "manual",
+      "description": "On-demand health checks"
+    }
+  ],
+  "dependencies": [
+    {
+      "type": "service",
+      "name": "metrics_collector",
+      "required": true
+    },
+    {
+      "type": "service",
+      "name": "notification_service",
+      "required": true
+    },
+    {
+      "type": "agent",
+      "name": "devops_agent",
+      "required": false,
+      "relationship": "alerts"
+    }
+  ],
+  "validation": {
+    "required_fields": [
+      "monitoring_targets",
+      "alert_recipients",
+      "threshold_configuration"
+    ],
+    "output_validation": [
+      "metrics_collected",
+      "alerts_functional",
+      "dashboards_accessible"
+    ]
+  }
+}
