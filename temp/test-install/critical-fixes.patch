@@ -1,0 +1,127 @@
+--- install.sh.original	2024-01-01 00:00:00.000000000 -0000
++++ install.sh.fixed	2024-01-01 00:00:00.000000000 -0000
+@@ -103,7 +103,13 @@
+     if [[ "$OS" == "macOS" ]]; then
+         if ! command -v brew &>/dev/null; then
+             status "Installing Homebrew (required for macOS)..."
+-            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" >> "$LOG_FILE" 2>&1
++            status "${DIM}This may take 5-10 minutes on first install${NC}"
++            # Show Homebrew installation progress
++            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" 2>&1 | while IFS= read -r line; do
++                if [[ "$line" =~ "==>" ]] || [[ "$line" =~ "Downloading" ]]; then
++                    status "  ${DIM}${line:0:60}${NC}"
++                fi
++            done
+         fi
+         brew install node >> "$LOG_FILE" 2>&1 || status "${YELLOW}Warning: Node.js installation had issues${NC}"
+     else
+@@ -119,7 +125,11 @@
+ if ! command -v redis-server &>/dev/null; then
+     if [[ "$OS" == "macOS" ]]; then
+-        brew install redis >> "$LOG_FILE" 2>&1 && brew services start redis >> "$LOG_FILE" 2>&1
++        status "  ${DIM}Downloading and installing Redis...${NC}"
++        brew install redis 2>&1 | grep -E "(Downloading|Installing|Pouring)" | while read line; do
++            status "  ${DIM}${line:0:60}${NC}"
++        done
++        brew services start redis >> "$LOG_FILE" 2>&1
+     else
+         sudo apt-get update >> "$LOG_FILE" 2>&1
+         sudo apt-get install -y redis-server >> "$LOG_FILE" 2>&1
+@@ -131,7 +141,10 @@
+ # Ollama
+ status "Setting up Ollama AI platform..."
+ if ! command -v ollama &>/dev/null; then
+-    curl -fsSL https://ollama.ai/install.sh | sh >> "$LOG_FILE" 2>&1
++    status "  ${DIM}Downloading Ollama installer...${NC}"
++    curl -fsSL https://ollama.ai/install.sh -o /tmp/ollama-install.sh --progress-bar
++    status "  ${DIM}Running Ollama installer...${NC}"
++    sh /tmp/ollama-install.sh 2>&1 | tee -a "$LOG_FILE" | grep -v "^$"
+ fi
+ status "Ollama ready"
+ echo ""
+@@ -168,10 +181,23 @@
+ echo "Installing Dependencies"
+ echo ""
+ 
+-status "Installing npm packages..."
+-npm_output=$(npm install --progress=false 2>&1) || {
+-    status "${YELLOW}Retrying with legacy peer deps...${NC}"
+-    npm install --legacy-peer-deps --progress=false >> "$LOG_FILE" 2>&1
++status "Installing npm packages (this may take 2-5 minutes)..."
++# Remove --progress=false to show npm's progress
++npm install 2>&1 | tee -a "$LOG_FILE" | while IFS= read -r line; do
++    if [[ "$line" =~ "added" ]] || [[ "$line" =~ "updated" ]]; then
++        status "  ${GREEN}→${NC} ${line:0:60}"
++    elif [[ "$line" =~ "npm WARN" ]]; then
++        # Skip warnings in output but log them
++        echo "$line" >> "$LOG_FILE"
++    elif [[ "$line" =~ "npm ERR!" ]]; then
++        status "  ${RED}✗${NC} ${line}"
++    fi
++done || {
++    status "${YELLOW}Retrying with legacy peer deps...${NC}"
++    npm install --legacy-peer-deps 2>&1 | tee -a "$LOG_FILE" | while IFS= read -r line; do
++        [[ "$line" =~ "added" ]] && status "  ${GREEN}→${NC} ${line:0:60}"
++    done
++}
+ status "Dependencies installed"
+ echo ""
+ 
+@@ -180,18 +206,39 @@
+ echo ""
+ 
+ status "Starting AI model downloads in background..."
+-status "Models downloading: llama3.2:3b (1.9GB), qwen2.5:7b (4.4GB)"
++status "Models to download:"
++status "  • llama3.2:3b (1.9GB)"
++status "  • qwen2.5:7b (4.4GB)"
+ status "${DIM}This will continue in background while installation proceeds${NC}"
+ 
+ # Start model downloads in background
+ {
+-    ollama pull llama3.2:3b >> "$LOG_FILE" 2>&1 &
++    echo "[$(date)] Starting llama3.2:3b download" >> "$LOG_FILE"
++    ollama pull llama3.2:3b 2>&1 | while read line; do
++        echo "[llama3.2:3b] $line" >> "$LOG_FILE"
++    done &
+     LLAMA_PID=$!
+-    ollama pull qwen2.5:7b >> "$LOG_FILE" 2>&1 &
++    
++    echo "[$(date)] Starting qwen2.5:7b download" >> "$LOG_FILE"
++    ollama pull qwen2.5:7b 2>&1 | while read line; do
++        echo "[qwen2.5:7b] $line" >> "$LOG_FILE"
++    done &
+     QWEN_PID=$!
+     
++    # Background monitor to show progress
++    {
++        while kill -0 $LLAMA_PID 2>/dev/null || kill -0 $QWEN_PID 2>/dev/null; do
++            echo "[$(date)] Model downloads still in progress" >> "$LOG_FILE"
++            sleep 30
++        done
++        echo "[$(date)] All model downloads complete" >> "$LOG_FILE"
++    } &
++    
+     # Monitor in background
+     {
+         while kill -0 $LLAMA_PID 2>/dev/null; do sleep 5; done
+         echo "[$(date)] llama3.2:3b download complete" >> "$LOG_FILE"
++        # Try to notify user if still in installer
++        echo -e "\n${GREEN}✓${NC} Model llama3.2:3b downloaded" 2>/dev/null || true
+     } &
+     
+     {
+@@ -228,7 +275,12 @@
+ # Run setup script if available
+ if [[ -f "scripts/setup.js" ]]; then
+     status "Running initial setup..."
+-    node scripts/setup.js >> "$LOG_FILE" 2>&1 || status "${YELLOW}Setup script had warnings${NC}"
++    node scripts/setup.js 2>&1 | tee -a "$LOG_FILE" | while IFS= read -r line; do
++        # Show important setup messages
++        if [[ "$line" =~ "Creating" ]] || [[ "$line" =~ "Setting up" ]]; then
++            status "  ${DIM}${line:0:60}${NC}"
++        fi
++    done || status "${YELLOW}Setup script had warnings${NC}"
+ fi
+ 
+ status "System configuration complete"

@@ -20,7 +20,8 @@
     "test:ui": "node src/terminal-feedback-demo.js",
     "clean": "node scripts/cleanup.js",
     "health": "node scripts/health-check.js",
-    "install-deps": "./install.sh"
+    "install-deps": "./install.sh",
+    "demo": "node demo-debo.js"
   },
   "dependencies": {
     "@langchain/community": "^0.3.45",

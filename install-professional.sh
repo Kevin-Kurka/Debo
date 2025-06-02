@@ -6,7 +6,6 @@
 set -euo pipefail
 
 # Script configuration
-REPO_URL="https://github.com/Kevin-Kurka/Debo.git"
 INSTALL_DIR="${DEBO_INSTALL_DIR:-$HOME/debo}"
 LOG_FILE="/tmp/debo-install-$$.log"
 
@@ -38,18 +37,6 @@ status() {
     printf "\r%-80s\n" "$1"
 }
 
-# Show progress dots for background operations
-show_dots() {
-    local pid=$1
-    local message=$2
-    printf "$message"
-    while kill -0 $pid 2>/dev/null; do
-        printf "."
-        sleep 1
-    done
-    echo " done"
-}
-
 # Show banner
 clear
 echo -e "${CYAN}${BOLD}"
@@ -74,17 +61,6 @@ echo ""
 # System Analysis
 echo "System Analysis"
 echo ""
-
-# Check network connectivity first
-printf "Checking network connectivity... "
-if ! curl -s --head https://github.com >/dev/null 2>&1; then
-    echo "FAILED"
-    echo ""
-    echo "${RED}Error: No internet connection detected${NC}"
-    echo "Please check your network connection and try again."
-    exit 1
-fi
-echo "OK"
 
 # Check OS and architecture
 OS="unknown"
@@ -126,18 +102,9 @@ if ! command -v node &>/dev/null; then
     if [[ "$OS" == "macOS" ]]; then
         if ! command -v brew &>/dev/null; then
             status "Installing Homebrew (required for macOS)..."
-            status "${DIM}This may take 5-10 minutes on first install${NC}"
-            # Show Homebrew installation progress
-            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" 2>&1 | while IFS= read -r line; do
-                if [[ "$line" =~ "==>" ]] || [[ "$line" =~ "Downloading" ]]; then
-                    status "  ${DIM}${line:0:60}${NC}"
-                fi
-            done
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" >> "$LOG_FILE" 2>&1
         fi
-        status "  ${DIM}Installing Node.js via Homebrew...${NC}"
-        brew install node 2>&1 | tee -a "$LOG_FILE" | grep -E "(Downloading|Installing|Pouring)" | while read line; do
-            status "  ${DIM}${line:0:60}${NC}"
-        done || status "${YELLOW}Warning: Node.js installation had issues${NC}"
+        brew install node >> "$LOG_FILE" 2>&1 || status "${YELLOW}Warning: Node.js installation had issues${NC}"
     else
         status "${YELLOW}Please install Node.js 18+ manually from nodejs.org${NC}"
     fi
@@ -150,11 +117,7 @@ fi
 status "Setting up Redis database..."
 if ! command -v redis-server &>/dev/null; then
     if [[ "$OS" == "macOS" ]]; then
-        status "  ${DIM}Downloading and installing Redis...${NC}"
-        brew install redis 2>&1 | grep -E "(Downloading|Installing|Pouring)" | while read line; do
-            status "  ${DIM}${line:0:60}${NC}"
-        done
-        brew services start redis >> "$LOG_FILE" 2>&1
+        brew install redis >> "$LOG_FILE" 2>&1 && brew services start redis >> "$LOG_FILE" 2>&1
     else
         sudo apt-get update >> "$LOG_FILE" 2>&1
         sudo apt-get install -y redis-server >> "$LOG_FILE" 2>&1
@@ -166,10 +129,7 @@ status "Redis configured"
 # Ollama
 status "Setting up Ollama AI platform..."
 if ! command -v ollama &>/dev/null; then
-    status "  ${DIM}Downloading Ollama installer...${NC}"
-    curl -fsSL https://ollama.ai/install.sh -o /tmp/ollama-install.sh --progress-bar 2>&1 | grep -v "^$"
-    status "  ${DIM}Running Ollama installer...${NC}"
-    sh /tmp/ollama-install.sh 2>&1 | tee -a "$LOG_FILE" | grep -v "^$"
+    curl -fsSL https://ollama.ai/install.sh | sh >> "$LOG_FILE" 2>&1
 fi
 status "Ollama ready"
 echo ""
@@ -206,22 +166,10 @@ cd "$INSTALL_DIR" || exit 1
 echo "Installing Dependencies"
 echo ""
 
-status "Installing npm packages (this may take 2-5 minutes)..."
-# Show npm progress
-npm install 2>&1 | tee -a "$LOG_FILE" | while IFS= read -r line; do
-    if [[ "$line" =~ "added" ]] || [[ "$line" =~ "updated" ]]; then
-        status "  ${GREEN}→${NC} ${line:0:60}"
-    elif [[ "$line" =~ "npm WARN" ]]; then
-        # Skip warnings in output but log them
-        echo "$line" >> "$LOG_FILE"
-    elif [[ "$line" =~ "npm ERR!" ]]; then
-        status "  ${RED}✗${NC} ${line}"
-    fi
-done || {
+status "Installing npm packages..."
+npm_output=$(npm install --progress=false 2>&1) || {
     status "${YELLOW}Retrying with legacy peer deps...${NC}"
-    npm install --legacy-peer-deps 2>&1 | tee -a "$LOG_FILE" | while IFS= read -r line; do
-        [[ "$line" =~ "added" ]] && status "  ${GREEN}→${NC} ${line:0:60}"
-    done
+    npm install --legacy-peer-deps --progress=false >> "$LOG_FILE" 2>&1
 }
 status "Dependencies installed"
 echo ""
@@ -231,22 +179,13 @@ echo "AI Model Configuration"
 echo ""
 
 status "Starting AI model downloads in background..."
-status "Models to download:"
-status "  • llama3.2:3b (1.9GB)"
-status "  • qwen2.5:7b (4.4GB)"
+status "Models downloading: llama3.2:3b (1.9GB), qwen2.5:7b (4.4GB)"
 status "${DIM}This will continue in background while installation proceeds${NC}"
-
-# Create a temporary file to track download progress
-PROGRESS_FILE="/tmp/debo-model-progress-$$"
-touch "$PROGRESS_FILE"
 
 # Start model downloads in background
 {
-    echo "[$(date)] Starting llama3.2:3b download" >> "$LOG_FILE"
     ollama pull llama3.2:3b >> "$LOG_FILE" 2>&1 &
     LLAMA_PID=$!
-    
-    echo "[$(date)] Starting qwen2.5:7b download" >> "$LOG_FILE"
     ollama pull qwen2.5:7b >> "$LOG_FILE" 2>&1 &
     QWEN_PID=$!
     
@@ -288,12 +227,7 @@ fi
 # Run setup script if available
 if [[ -f "scripts/setup.js" ]]; then
     status "Running initial setup..."
-    node scripts/setup.js 2>&1 | tee -a "$LOG_FILE" | while IFS= read -r line; do
-        # Show important setup messages
-        if [[ "$line" =~ "Creating" ]] || [[ "$line" =~ "Setting up" ]] || [[ "$line" =~ "Initializing" ]]; then
-            status "  ${DIM}${line:0:60}${NC}"
-        fi
-    done || status "${YELLOW}Setup script had warnings${NC}"
+    node scripts/setup.js >> "$LOG_FILE" 2>&1 || status "${YELLOW}Setup script had warnings${NC}"
 fi
 
 status "System configuration complete"
